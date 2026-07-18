@@ -55,9 +55,9 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
   }
 
   const cfg = loadConfig();
-  if (!cfg.realtime.apiKey) {
+  if (cfg.voiceMode === 'realtime' && !cfg.realtime.apiKey) {
     const open = await vscode.window.showErrorMessage(
-      'No Realtime API key configured. Set interviewLele.realtime.apiKey (or OPENAI_API_KEY env var).',
+      'No Realtime API key configured. Set interviewLele.realtime.apiKey (or OPENAI_API_KEY env var), or switch voiceMode to auto/chained.',
       'Open Settings'
     );
     if (open) vscode.commands.executeCommand('workbench.action.openSettings', 'interviewLele');
