@@ -1,0 +1,326 @@
+{
+  "name": "interview-lele",
+  "displayName": "Interview Lele",
+  "description": "Voice-driven technical interview using ACP agents to understand your codebase, then asks you questions by opening files, highlighting code, and talking to you in real time.",
+  "version": "0.1.0",
+  "publisher": "interview-lele",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning",
+    "Education"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "interviewLele.startInterview",
+        "title": "Interview Lele: Start Interview"
+      },
+      {
+        "command": "interviewLele.stopInterview",
+        "title": "Interview Lele: Stop Interview"
+      },
+      {
+        "command": "interviewLele.showLogs",
+        "title": "Interview Lele: Show Logs"
+      },
+      {
+        "command": "interviewLele.refreshAgents",
+        "title": "Interview Lele: Refresh ACP Agents"
+      },
+      {
+        "command": "interviewLele.testMic",
+        "title": "Interview Lele: Test Microphone"
+      },
+      {
+        "command": "interviewLele.testSpeaker",
+        "title": "Interview Lele: Test Speaker (TTS)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "interviewLele",
+          "title": "Interview Lele",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "interviewLele": [
+        {
+          "id": "interviewLele.home",
+          "name": "Home",
+          "type": "webview"
+        }
+      ]
+    },
+    "menus": {},
+    "configuration": {
+      "title": "Interview Lele",
+      "properties": {
+        "interviewLele.voiceMode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "realtime",
+            "chained"
+          ],
+          "default": "auto",
+          "description": "Realtime = WebSocket STT+TTS on one connection. Chained = separate STT (OpenRouter/Voxtral) + chat + TTS (Kokoro)."
+        },
+        "interviewLele.realtime.baseUrl": {
+          "type": "string",
+          "default": "wss://api.openai.com/v1/realtime",
+          "description": "OpenAI-compatible Realtime API base URL (WebSocket)."
+        },
+        "interviewLele.realtime.model": {
+          "type": "string",
+          "default": "gpt-4o-realtime-preview",
+          "description": "Realtime conversation model id."
+        },
+        "interviewLele.realtime.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the Realtime endpoint. Falls back to OPENAI_API_KEY env var."
+        },
+        "interviewLele.realtime.voice": {
+          "type": "string",
+          "default": "alloy",
+          "description": "TTS voice id used by the Realtime model.",
+          "enum": [
+            "alloy",
+            "ash",
+            "ballad",
+            "coral",
+            "echo",
+            "sage",
+            "shimmer",
+            "verse"
+          ]
+        },
+        "interviewLele.realtime.instructions": {
+          "type": "string",
+          "default": "You are a senior engineering interviewer conducting a live, voice-based technical interview. Ask one focused question at a time about the code the candidate has open. Be curious, friendly, and rigorous. When the candidate answers, acknowledge briefly and ask a natural follow-up or move to a new area. Keep turns short and conversational.",
+          "description": "System instructions for the interviewer persona."
+        },
+        "interviewLele.realtime.inputFormat": {
+          "type": "string",
+          "default": "pcm16",
+          "enum": [
+            "pcm16",
+            "g711_ulaw",
+            "g711_alaw",
+            "opus"
+          ],
+          "description": "Audio format sent to the Realtime API."
+        },
+        "interviewLele.realtime.outputFormat": {
+          "type": "string",
+          "default": "pcm16",
+          "enum": [
+            "pcm16",
+            "g711_ulaw",
+            "g711_alaw",
+            "opus"
+          ],
+          "description": "Audio format received from the Realtime API."
+        },
+        "interviewLele.realtime.sampleRate": {
+          "type": "number",
+          "default": 24000,
+          "description": "Sample rate (Hz) used for mic capture and playback."
+        },
+        "interviewLele.realtime.turnDetection": {
+          "type": "string",
+          "default": "server_vad",
+          "enum": [
+            "server_vad",
+            "none"
+          ],
+          "description": "Turn detection mode. 'server_vad' lets the server detect speech endpoints."
+        },
+        "interviewLele.stt.baseUrl": {
+          "type": "string",
+          "default": "https://openrouter.ai/api/v1",
+          "description": "Base URL for speech-to-text (OpenAI-compatible /audio/transcriptions)."
+        },
+        "interviewLele.stt.model": {
+          "type": "string",
+          "default": "mistralai/voxtral-mini-transcribe",
+          "description": "STT model slug. Voxtral Mini Transcribe via OpenRouter by default."
+        },
+        "interviewLele.stt.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for STT endpoint. Falls back to OPENROUTER_API_KEY then OPENAI_API_KEY."
+        },
+        "interviewLele.stt.path": {
+          "type": "string",
+          "default": "/audio/transcriptions"
+        },
+        "interviewLele.stt.language": {
+          "type": "string",
+          "default": "en",
+          "description": "ISO-639-1 language code. Empty = auto-detect."
+        },
+        "interviewLele.tts.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:8881/v1",
+          "description": "Base URL for text-to-speech (OpenAI-compatible /audio/speech). Kokoro FastAPI by default."
+        },
+        "interviewLele.tts.model": {
+          "type": "string",
+          "default": "tts-1"
+        },
+        "interviewLele.tts.apiKey": {
+          "type": "string",
+          "default": "not-needed",
+          "description": "API key for TTS endpoint. Kokoro doesn't require one."
+        },
+        "interviewLele.tts.voice": {
+          "type": "string",
+          "default": "af_heart",
+          "description": "Voice name. Kokoro voices: af_heart, af_bella, af_nova, etc."
+        },
+        "interviewLele.tts.path": {
+          "type": "string",
+          "default": "/audio/speech"
+        },
+        "interviewLele.chat.baseUrl": {
+          "type": "string",
+          "default": "https://openrouter.ai/api/v1",
+          "description": "Base URL for chat completions (chained mode)."
+        },
+        "interviewLele.chat.model": {
+          "type": "string",
+          "default": "openai/gpt-5.6",
+          "description": "Chat model for interview orchestration in chained mode."
+        },
+        "interviewLele.chat.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for chat endpoint. Falls back to OPENROUTER_API_KEY then OPENAI_API_KEY."
+        },
+        "interviewLele.chat.path": {
+          "type": "string",
+          "default": "/chat/completions"
+        },
+        "interviewLele.audio.ffmpegPath": {
+          "type": "string",
+          "default": "ffmpeg",
+          "description": "Path to ffmpeg binary used for mic capture. Defaults to system PATH."
+        },
+        "interviewLele.audio.inputDevice": {
+          "type": "string",
+          "default": "",
+          "description": "Optional ffmpeg audio input device (e.g. 'dshow' device name on Windows, 'avfoundation' device index on macOS). Leave empty for default."
+        },
+        "interviewLele.audio.inputDeviceId": {
+          "type": "number",
+          "default": -1,
+          "description": "PortAudio input device ID for mic capture. -1 = default device. Use the dropdown in the settings panel to pick."
+        },
+        "interviewLele.audio.silenceSeconds": {
+          "type": "number",
+          "default": 2.0,
+          "description": "Seconds of silence before ending a speech segment. Higher = more patient (good for thoughtful answers), lower = snappier."
+        },
+        "interviewLele.audio.beepEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Play a beep sound when it's your turn to speak."
+        },
+        "interviewLele.acp.selectedAgentId": {
+          "type": "string",
+          "default": "",
+          "description": "Id of the ACP agent used to gather codebase context. Built-in ids: codex, devin."
+        },
+        "interviewLele.acp.agentConfigs": {
+          "type": "object",
+          "default": {},
+          "description": "Per-agent configuration map (agentId -> { model, reasoningEffort, agentMode, sandboxMode, modelProvider, extraEnv, extraSessionConfig }). Set via the Configure ACP Agent command.",
+          "scope": "application"
+        },
+        "interviewLele.acp.contextPrompt": {
+          "type": "string",
+          "default": "You are analyzing this codebase to help prepare a technical interview of the author. Produce a concise structured summary covering: (1) the project's purpose and tech stack, (2) the most important files and why they matter, (3) the trickiest or most interesting code areas worth probing in an interview, and (4) 5-10 candidate interview topics each tied to a specific file path and a short rationale. Return the result as JSON with keys: summary, files (array of {path, role}), topics (array of {title, filePath, lineStart, lineEnd, rationale}).",
+          "description": "Prompt sent to the ACP agent to extract interview-relevant context."
+        },
+        "interviewLele.acp.customAgents": {
+          "type": "array",
+          "default": [],
+          "description": "Additional ACP-over-stdio agents. Validated with an ACP initialize handshake when used.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "command"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              }
+            }
+          }
+        },
+        "interviewLele.interview.maxQuestions": {
+          "type": "number",
+          "default": 0,
+          "description": "Maximum number of questions to ask. 0 = unlimited until the user stops."
+        },
+        "interviewLele.interview.difficulty": {
+          "type": "string",
+          "enum": [
+            "adaptive",
+            "junior",
+            "mid",
+            "senior",
+            "staff"
+          ],
+          "default": "adaptive"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:naudiodon2 --format=cjs --platform=node --target=node18 --sourcemap && node scripts/copy-native.mjs",
+    "watch": "npm run build -- --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "vsce package --no-yarn --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.90.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "naudiodon2": "^2.5.0",
+    "ws": "^8.18.0"
+  }
+}
