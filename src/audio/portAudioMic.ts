@@ -180,16 +180,56 @@ export class PortAudioMicCapture extends EventEmitter {
     }
   }
 
+  /** Find the default input device ID by querying PortAudio's host APIs. */
+  static getDefaultInputDeviceId(): number {
+    try {
+      const pa = loadPortAudio();
+      const hostApiInfo = pa.getHostAPIs();
+      const hostApis = hostApiInfo?.HostAPIs ?? hostApiInfo;
+      const defaultHostIdx = hostApiInfo?.defaultHostAPI ?? 0;
+      if (Array.isArray(hostApis)) {
+        // Prefer the default host API's default input device
+        const defaultApi = hostApis[defaultHostIdx];
+        if (defaultApi && defaultApi.defaultInput !== undefined && defaultApi.defaultInput >= 0) {
+          logger.log(`Default input device ID: ${defaultApi.defaultInput} (host API: ${defaultApi.name})`);
+          return defaultApi.defaultInput;
+        }
+        // Fallback: any host API with a valid default input
+        for (const api of hostApis) {
+          if (api.defaultInput !== undefined && api.defaultInput !== null && api.defaultInput >= 0) {
+            logger.log(`Default input device ID: ${api.defaultInput} (host API: ${api.name})`);
+            return api.defaultInput;
+          }
+        }
+      }
+      // Fallback: find first input device
+      const all = pa.getDevices().filter((d: any) => d.maxInputChannels > 0);
+      if (all.length) {
+        logger.log(`No default found, using first input device: ${all[0].id} (${all[0].name})`);
+        return all[0].id;
+      }
+    } catch (e) {
+      logger.error(`Failed to get default input device: ${(e as Error).message}`);
+    }
+    return -1;
+  }
+
   start(): void {
     if (this.audioIn) return;
     try {
       const pa = loadPortAudio();
+      // Resolve device ID: if -1 (default), find the actual default device ID
+      let deviceId = this.deviceId ?? -1;
+      if (deviceId < 0) {
+        deviceId = PortAudioMicCapture.getDefaultInputDeviceId();
+        logger.log(`Using default input device ID: ${deviceId}`);
+      }
       this.audioIn = new pa.AudioIO({
         inOptions: {
           channelCount: this.channels,
           sampleFormat: pa.SampleFormat16Bit,
           sampleRate: this.sampleRate,
-          deviceId: this.deviceId ?? -1, // -1 = default
+          deviceId,
         },
       });
     } catch (e) {
