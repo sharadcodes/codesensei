@@ -30,7 +30,21 @@ function loadPortAudio(): any {
     throw new Error('naudiodon2 not found. Install it with: npm install naudiodon2 && npx node-gyp rebuild --directory=node_modules/naudiodon2');
   }
   logger.log(`Loading naudiodon native addon from ${addonPath}`);
-  const binding = require(addonPath);
+  try {
+    const binding = require(addonPath);
+    return createPortAudioWrapper(binding);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    const expected = `${process.platform}-${process.arch}`;
+    throw new Error(
+      `The bundled microphone addon is not compatible with this VS Code installation ` +
+      `(${expected}). Reinstall the ${expected} build of AI CodeSensei. Native load error: ${detail}`
+    );
+  }
+}
+
+/** Wrap the raw binding used by packaged extensions with naudiodon2's AudioIO API. */
+function createPortAudioWrapper(binding: any): any {
 
   // Minimal AudioIO wrapper matching naudiodon2's API
   function AudioIO(options: any): Readable {
