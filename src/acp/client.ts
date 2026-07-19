@@ -50,6 +50,7 @@ export class AcpClient extends EventEmitter {
   private buffer = '';
   private closed = false;
   private initialized = false;
+  private disposeReason: Error | null = null;
 
   constructor(
     private readonly command: ResolvedAgentCommand,
@@ -154,10 +155,13 @@ export class AcpClient extends EventEmitter {
       if (!waiter) return;
       this.pending.delete(msg.id);
       const summary = msg.error
-        ? `error: ${msg.error.message ?? 'ACP error'}`
+        ? `error: ${msg.error.message ?? 'ACP error'} (code: ${msg.error.code ?? 'n/a'}${msg.error.data ? `, data: ${JSON.stringify(msg.error.data).slice(0, 300)}` : ''})`
         : `result: ${JSON.stringify(msg.result).slice(0, 200)}`;
       logger.log(`← ACP #${msg.id} ${summary}`);
-      if (msg.error) waiter.reject(new Error(msg.error.message || 'ACP error'));
+      if (msg.error) {
+        const detail = msg.error.data ? ` — ${JSON.stringify(msg.error.data).slice(0, 500)}` : '';
+        waiter.reject(new Error(`${msg.error.message || 'ACP error'} (code ${msg.error.code ?? 'n/a'})${detail}`));
+      }
       else waiter.resolve(msg.result);
       return;
     }
@@ -169,9 +173,9 @@ export class AcpClient extends EventEmitter {
       } else if (msg.method === 'session/request_permission') {
         // Server-initiated request expects a response
         this.emit('permission', msg.params as PermissionRequest);
-        // Auto-approve by default for read-only context gathering; the orchestrator can override.
-        // We respond below once a listener has a chance to handle it. For simplicity, auto-allow.
-        this.respond(msg.id, { outcome: { outcome: 'selected', optionId: 'allow-once' } });
+        // Repository analysis must remain read-only. Agents can read through their
+        // own sandbox, but unexpected write/command permission requests are rejected.
+        this.respond(msg.id, { outcome: { outcome: 'rejected' } });
       } else if (msg.method === 'session/cancel') {
         this.emit('cancel', msg.params);
       } else {
@@ -190,7 +194,16 @@ export class AcpClient extends EventEmitter {
   private request(method: string, params: any): Promise<unknown> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        if (this.pending.has(id)) {
+          this.pending.delete(id);
+          reject(new Error(`ACP ${method} timed out after 120s`));
+        }
+      }, 120_000);
+      this.pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v); },
+        reject: (e) => { clearTimeout(timer); reject(e); },
+      });
       this.send({ jsonrpc: '2.0', id, method, params });
     });
   }
@@ -228,11 +241,31 @@ export class AcpClient extends EventEmitter {
     return res.sessionId;
   }
 
+  /**
+   * Load an existing session, replaying the full conversation history via
+   * `session/update` notifications before this resolves. Only call this if
+   * the agent advertised `agentCapabilities.loadSession === true` on
+   * `initialize` — the protocol says Clients MUST NOT call it otherwise.
+   */
+  async loadSession(sessionId: string, cwd: string, mcpServers: unknown[] = []): Promise<void> {
+    await this.request('session/load', { sessionId, cwd, mcpServers });
+  }
+
+  /**
+   * Resume an existing session without replaying prior messages (lighter
+   * weight than `session/load`). Only call this if the agent advertised
+   * `agentCapabilities.sessionCapabilities.resume` on `initialize`.
+   */
+  async resumeSession(sessionId: string, cwd: string, mcpServers: unknown[] = []): Promise<unknown> {
+    return this.request('session/resume', { sessionId, cwd, mcpServers });
+  }
+
   async prompt(sessionId: string, prompt: Array<Record<string, unknown>>): Promise<{ stopReason: string }> {
     return (await this.request('session/prompt', { sessionId, prompt })) as { stopReason: string };
   }
 
   async cancel(sessionId: string): Promise<void> {
+    if (!this.proc || this.closed) return;
     this.send({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId } });
   }
 
@@ -248,7 +281,10 @@ export class AcpClient extends EventEmitter {
     return this.initialized;
   }
 
-  async dispose(): Promise<void> {
+  async dispose(reason: Error = new Error('ACP client disposed')): Promise<void> {
+    this.disposeReason = reason;
+    for (const pending of this.pending.values()) pending.reject(reason);
+    this.pending.clear();
     try {
       if (this.proc && !this.closed) {
         this.proc.stdin?.end();
@@ -258,5 +294,6 @@ export class AcpClient extends EventEmitter {
       /* ignore */
     }
     this.proc = null;
+    this.closed = true;
   }
 }
