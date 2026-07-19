@@ -98,7 +98,7 @@ export class ChainedVoiceProvider extends EventEmitter {
       model: tts.model,
       input: text,
       voice: tts.voice,
-      response_format: 'mp3',
+      response_format: tts.responseFormat || 'wav',
     };
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (tts.apiKey && tts.apiKey !== 'not-needed') headers['Authorization'] = `Bearer ${tts.apiKey}`;

@@ -133,6 +133,7 @@ export class PortAudioMicCapture extends EventEmitter {
   private chunkCount = 0;
   private lastLevelEmit = 0;
   private readonly levelEmitMs = 50; // emit level events at ~20fps
+  private passthrough: boolean;
 
   constructor(opts: {
     sampleRate?: number;
@@ -144,6 +145,7 @@ export class PortAudioMicCapture extends EventEmitter {
     rmsStart?: number;
     rmsStop?: number;
     preRollMs?: number;
+    passthrough?: boolean;
   }) {
     super();
     this.sampleRate = opts.sampleRate ?? 16000;
@@ -154,6 +156,7 @@ export class PortAudioMicCapture extends EventEmitter {
     this.maxSpeechMs = opts.maxSpeechMs ?? 60000;   // 60s max
     this.rmsStart = opts.rmsStart ?? 0.006;         // lower threshold for speech start
     this.rmsStop = opts.rmsStop ?? 0.004;           // lower threshold for silence
+    this.passthrough = opts.passthrough ?? false;
     // Pre-roll: keep last N chunks (~500ms) so we don't miss the start of speech
     const preRollMs = opts.preRollMs ?? 500;
     // Each chunk at 16kHz/16bit/mono is ~256 samples = 16ms, so ~31 chunks for 500ms
@@ -273,8 +276,28 @@ export class PortAudioMicCapture extends EventEmitter {
   }
 
   private processChunk(chunk: Buffer): void {
+    const alignedChunk = chunk.byteOffset % 2 === 0 ? chunk : Buffer.from(chunk);
+    // In passthrough mode, emit raw PCM chunks for realtime streaming (no VAD)
+    if (this.passthrough) {
+      if (!this.muted && !this.cancelled) this.emit('data', alignedChunk);
+      // Still emit level for waveform
+      const now0 = Date.now();
+      if (now0 - this.lastLevelEmit >= this.levelEmitMs) {
+        this.lastLevelEmit = now0;
+        const s = new Int16Array(alignedChunk.buffer, alignedChunk.byteOffset, alignedChunk.length / 2);
+        let sum = 0, mx = 0;
+        for (let i = 0; i < s.length; i++) { const x = s[i] / 32768; sum += x * x; if (Math.abs(s[i]) > mx) mx = Math.abs(s[i]); }
+        const r = Math.sqrt(sum / s.length);
+        const points = 48;
+        const step = Math.max(1, Math.floor(s.length / points));
+        const wave: number[] = [];
+        for (let i = 0; i < s.length; i += step) wave.push(s[i] / 32768);
+        this.emit('level', { rms: r, peak: mx / 32768, recording: true, wave });
+      }
+      return;
+    }
     // Compute RMS for VAD
-    const samples = new Int16Array(chunk.buffer, chunk.byteOffset, chunk.length / 2);
+    const samples = new Int16Array(alignedChunk.buffer, alignedChunk.byteOffset, alignedChunk.length / 2);
     let sum = 0;
     let maxSample = 0;
     for (let i = 0; i < samples.length; i++) {

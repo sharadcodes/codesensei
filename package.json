@@ -74,87 +74,7 @@
     "configuration": {
       "title": "Codebase Tutor",
       "properties": {
-        "interviewLele.voiceMode": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "realtime",
-            "chained"
-          ],
-          "default": "auto",
-          "description": "Realtime = WebSocket STT+TTS on one connection. Chained = separate STT (OpenRouter/Voxtral) + chat + TTS (Kokoro)."
-        },
-        "interviewLele.realtime.baseUrl": {
-          "type": "string",
-          "default": "wss://api.openai.com/v1/realtime",
-          "description": "OpenAI-compatible Realtime API base URL (WebSocket)."
-        },
-        "interviewLele.realtime.model": {
-          "type": "string",
-          "default": "gpt-4o-realtime-preview",
-          "description": "Realtime conversation model id."
-        },
-        "interviewLele.realtime.apiKey": {
-          "type": "string",
-          "default": "",
-          "description": "API key for the Realtime endpoint. Falls back to OPENAI_API_KEY env var."
-        },
-        "interviewLele.realtime.voice": {
-          "type": "string",
-          "default": "alloy",
-          "description": "TTS voice id used by the Realtime model.",
-          "enum": [
-            "alloy",
-            "ash",
-            "ballad",
-            "coral",
-            "echo",
-            "sage",
-            "shimmer",
-            "verse"
-          ]
-        },
-        "interviewLele.realtime.instructions": {
-          "type": "string",
-          "default": "You are a friendly, rigorous codebase knowledge evaluator running a live, voice-based Ask Me Anything session. Ask the user one focused question at a time about the code they have open. When they answer, acknowledge briefly and ask a natural follow-up or move to a new area. Keep turns short and conversational.",
-          "description": "System instructions for the Ask Me Anything evaluator."
-        },
-        "interviewLele.realtime.inputFormat": {
-          "type": "string",
-          "default": "pcm16",
-          "enum": [
-            "pcm16",
-            "g711_ulaw",
-            "g711_alaw",
-            "opus"
-          ],
-          "description": "Audio format sent to the Realtime API."
-        },
-        "interviewLele.realtime.outputFormat": {
-          "type": "string",
-          "default": "pcm16",
-          "enum": [
-            "pcm16",
-            "g711_ulaw",
-            "g711_alaw",
-            "opus"
-          ],
-          "description": "Audio format received from the Realtime API."
-        },
-        "interviewLele.realtime.sampleRate": {
-          "type": "number",
-          "default": 24000,
-          "description": "Sample rate (Hz) used for mic capture and playback."
-        },
-        "interviewLele.realtime.turnDetection": {
-          "type": "string",
-          "default": "server_vad",
-          "enum": [
-            "server_vad",
-            "none"
-          ],
-          "description": "Turn detection mode. 'server_vad' lets the server detect speech endpoints."
-        },
+
         "interviewLele.stt.baseUrl": {
           "type": "string",
           "default": "https://openrouter.ai/api/v1",
@@ -202,6 +122,12 @@
           "type": "string",
           "default": "/audio/speech"
         },
+        "interviewLele.tts.responseFormat": {
+          "type": "string",
+          "enum": ["wav", "flac", "ogg", "mp3", "opus"],
+          "default": "wav",
+          "description": "Audio format returned by the TTS endpoint. Kokoro supports wav/flac/ogg; OpenAI TTS supports mp3/opus/aac/flac."
+        },
         "interviewLele.chat.baseUrl": {
           "type": "string",
           "default": "https://openrouter.ai/api/v1",
@@ -220,16 +146,6 @@
         "interviewLele.chat.path": {
           "type": "string",
           "default": "/chat/completions"
-        },
-        "interviewLele.audio.ffmpegPath": {
-          "type": "string",
-          "default": "ffmpeg",
-          "description": "Path to ffmpeg binary used for mic capture. Defaults to system PATH."
-        },
-        "interviewLele.audio.inputDevice": {
-          "type": "string",
-          "default": "",
-          "description": "Optional ffmpeg audio input device (e.g. 'dshow' device name on Windows, 'avfoundation' device index on macOS). Leave empty for default."
         },
         "interviewLele.audio.inputDeviceId": {
           "type": "number",
@@ -329,13 +245,11 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.90.0",
-    "@types/ws": "^8.18.1",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.23.0",
     "typescript": "^5.5.0"
   },
   "dependencies": {
-    "naudiodon2": "^2.5.0",
-    "ws": "^8.18.0"
+    "naudiodon2": "^2.5.0"
   }
 }

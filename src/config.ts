@@ -1,19 +1,6 @@
 import * as vscode from 'vscode';
 
-export type VoiceMode = 'auto' | 'realtime' | 'chained';
 export type TutorExplanationMode = 'quick' | 'guided' | 'deep';
-
-export interface RealtimeConfig {
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-  voice: string;
-  instructions: string;
-  inputFormat: 'pcm16' | 'g711_ulaw' | 'g711_alaw' | 'opus';
-  outputFormat: 'pcm16' | 'g711_ulaw' | 'g711_alaw' | 'opus';
-  sampleRate: number;
-  turnDetection: 'server_vad' | 'none';
-}
 
 export interface SttConfig {
   baseUrl: string;
@@ -29,6 +16,7 @@ export interface TtsConfig {
   apiKey: string;
   voice: string;
   path: string;
+  responseFormat: 'wav' | 'flac' | 'ogg' | 'mp3' | 'opus';
 }
 
 export interface ChatConfig {
@@ -39,8 +27,6 @@ export interface ChatConfig {
 }
 
 export interface AudioConfig {
-  ffmpegPath: string;
-  inputDevice: string;
   inputDeviceId: number;
   silenceSeconds: number;
   beepEnabled: boolean;
@@ -65,8 +51,6 @@ export interface InterviewConfig {
 }
 
 export interface FullConfig {
-  voiceMode: VoiceMode;
-  realtime: RealtimeConfig;
   stt: SttConfig;
   tts: TtsConfig;
   chat: ChatConfig;
@@ -89,18 +73,6 @@ function resolveApiKey(settingKey: string, ...envFallbacks: string[]): string {
 export function loadConfig(): FullConfig {
   const cfg = vscode.workspace.getConfiguration('interviewLele');
   return {
-    voiceMode: cfg.get<VoiceMode>('voiceMode', 'auto'),
-    realtime: {
-      baseUrl: cfg.get('realtime.baseUrl', 'wss://api.openai.com/v1/realtime'),
-      model: cfg.get('realtime.model', 'gpt-4o-realtime-preview'),
-      apiKey: resolveApiKey('realtime.apiKey', 'OPENAI_API_KEY', 'CODEX_API_KEY'),
-      voice: cfg.get('realtime.voice', 'alloy'),
-      instructions: cfg.get('realtime.instructions', ''),
-      inputFormat: cfg.get('realtime.inputFormat', 'pcm16'),
-      outputFormat: cfg.get('realtime.outputFormat', 'pcm16'),
-      sampleRate: cfg.get('realtime.sampleRate', 24000),
-      turnDetection: cfg.get('realtime.turnDetection', 'server_vad'),
-    },
     // STT defaults to OpenRouter with Voxtral Mini Transcribe
     stt: {
       baseUrl: cfg.get('stt.baseUrl', 'https://openrouter.ai/api/v1'),
@@ -116,6 +88,7 @@ export function loadConfig(): FullConfig {
       apiKey: cfg.get('tts.apiKey', 'not-needed'),
       voice: cfg.get('tts.voice', 'af_heart'),
       path: cfg.get('tts.path', '/audio/speech'),
+      responseFormat: cfg.get<TtsConfig['responseFormat']>('tts.responseFormat', 'wav'),
     },
     // Chat defaults to OpenRouter
     chat: {
@@ -125,8 +98,6 @@ export function loadConfig(): FullConfig {
       path: cfg.get('chat.path', '/chat/completions'),
     },
     audio: {
-      ffmpegPath: cfg.get('audio.ffmpegPath', 'ffmpeg'),
-      inputDevice: cfg.get('audio.inputDevice', ''),
       inputDeviceId: cfg.get('audio.inputDeviceId', -1),
       silenceSeconds: cfg.get('audio.silenceSeconds', 2.0),
       beepEnabled: cfg.get('audio.beepEnabled', true),
@@ -144,6 +115,4 @@ export function loadConfig(): FullConfig {
   };
 }
 
-export function resolveApiKeyFromConfig(cfg: RealtimeConfig): string {
-  return cfg.apiKey || process.env.OPENAI_API_KEY || '';
-}
+

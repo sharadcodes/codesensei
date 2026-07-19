@@ -1,16 +1,12 @@
 import * as vscode from 'vscode';
-import { FullConfig, VoiceMode } from '../config';
+import { FullConfig } from '../config';
 import { CodebaseContext } from '../types';
-import { MicCapture } from '../audio/capture';
-import { AudioPlayback } from '../audio/playback';
 import { PortAudioMicCapture } from '../audio/portAudioMic';
 import { playListeningBeep } from '../audio/beep';
 import { AcpClient } from '../acp/client';
 import { DiscoveredAgent } from '../acp/registry';
 import { AgentConfig } from '../acp/agentConfig';
-import { OpenAIRealtimeProvider } from '../realtime/openai';
 import { ChainedVoiceProvider, ChainedTurn } from '../realtime/chained';
-import { RealtimeTool } from '../realtime/provider';
 import { openAndHighlight, clearHighlights } from '../ui/highlight';
 import { logger } from '../logger';
 import { HomeViewProvider } from '../ui/homeView';
@@ -18,13 +14,13 @@ import { StoredSession, saveSession } from './sessionStore';
 
 export interface InterviewEvent {
   kind:
-    | 'state'
-    | 'agent_message'
-    | 'user_transcript'
-    | 'file_opened'
-    | 'error'
-    | 'log'
-    | 'question_count';
+  | 'state'
+  | 'agent_message'
+  | 'user_transcript'
+  | 'file_opened'
+  | 'error'
+  | 'log'
+  | 'question_count';
   text?: string;
   filePath?: string;
   lineStart?: number;
@@ -54,36 +50,11 @@ export interface InterviewStartOptions {
   extContext?: vscode.ExtensionContext;
 }
 
-const OPEN_FILE_TOOL: RealtimeTool = {
-  type: 'function',
-  name: 'open_file',
-  description:
-    'Open a source file in the editor and highlight a specific line range so the user can see the code you are about to ask about. Call this BEFORE you ask the question whenever you focus on a concrete piece of code.',
-  parameters: {
-    type: 'object',
-    properties: {
-      filePath: { type: 'string', description: 'Repo-relative file path.' },
-      lineStart: { type: 'integer', description: '1-based start line (inclusive).' },
-      lineEnd: { type: 'integer', description: '1-based end line (inclusive).' },
-    },
-    required: ['filePath', 'lineStart', 'lineEnd'],
-  },
-};
 
-const END_INTERVIEW_TOOL: RealtimeTool = {
-  type: 'function',
-  name: 'end_interview',
-  description:
-    'Call this when you have tested enough of the user\'s understanding and want to wrap up Ask Me Anything with a brief assessment and goodbye.',
-  parameters: { type: 'object', properties: {} },
-};
 
 export class InterviewOrchestrator {
-  private provider: OpenAIRealtimeProvider | null = null;
   private chained: ChainedVoiceProvider | null = null;
-  private mic: MicCapture | null = null;
   private paMic: PortAudioMicCapture | null = null;
-  private playback: AudioPlayback | null = null;
   private acpClient: AcpClient | null = null;
   private state: InterviewState = 'idle';
   private questionCount = 0;
@@ -107,7 +78,7 @@ export class InterviewOrchestrator {
   }
 
   async start(opts: InterviewStartOptions): Promise<void> {
-    const { config, context, workspaceRoot, onEvent } = opts;
+    const { context, workspaceRoot } = opts;
     this.cancelled = false;
     this.questionCount = 0;
     this.workspaceRoot = workspaceRoot;
@@ -125,13 +96,7 @@ export class InterviewOrchestrator {
       };
     }
 
-    // Decide mode: auto → chained if realtime key missing, else realtime
-    const mode = this.resolveMode(config);
-    if (mode === 'chained') {
-      await this.startChained(opts);
-    } else {
-      await this.startRealtime(opts);
-    }
+    await this.startChained(opts);
   }
 
   /** Persist the current session state (context + transcript) to global storage. */
@@ -141,209 +106,7 @@ export class InterviewOrchestrator {
     void saveSession(this.extContext, this.sessionBase);
   }
 
-  private resolveMode(config: FullConfig): 'realtime' | 'chained' {
-    if (config.voiceMode === 'chained') return 'chained';
-    if (config.voiceMode === 'realtime') return 'realtime';
-    // auto: use chained if no realtime API key, else realtime
-    if (!config.realtime.apiKey) return 'chained';
-    return 'realtime';
-  }
 
-  // ─── Realtime mode (WebSocket STT+TTS) ────────────────────────────────
-
-  private async startRealtime(opts: InterviewStartOptions): Promise<void> {
-    const { config, context, workspaceRoot, onEvent } = opts;
-    const apiKey = config.realtime.apiKey;
-    if (!apiKey) {
-      onEvent({ kind: 'error', text: 'No API key configured. Set interviewLele.realtime.apiKey or OPENAI_API_KEY, or switch voiceMode to chained.' });
-      return;
-    }
-
-    this.setState('connecting', onEvent);
-
-    const topicsBrief = context.topics
-      .slice(0, 20)
-      .map((t, i) => `${i + 1}. ${t.title} — ${t.filePath}:${t.lineStart}-${t.lineEnd}\n   why: ${t.rationale}`)
-      .join('\n');
-
-    const filesBrief = context.files
-      .slice(0, 30)
-      .map((f) => `- ${f.path} — ${f.role}`)
-      .join('\n');
-
-    const instructions = `${config.realtime.instructions}
-
-You are testing the user's understanding of THIS codebase in Ask Me Anything:
-
-PROJECT SUMMARY:
-${context.summary}
-
-KEY FILES:
-${filesBrief}
-
-SUGGESTED KNOWLEDGE-CHECK TOPICS (use open_file before asking about each):
-${topicsBrief}
-${opts.priorTranscript && opts.priorTranscript.length > 0 ? `
-PREVIOUS INTERVIEW HISTORY (you are resuming a prior session):
-${opts.priorTranscript.map((t) => `${t.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${t.text}`).join('\n')}
-
-Continue the interview from where you left off. Do NOT repeat questions already asked.` : ''}
-
-KNOWLEDGE EVALUATOR — behave like a curious, supportive technical peer:
-- Speak naturally and concisely, as if on a phone/video call. No bullet points, no lectures, no markdown.
-- One question at a time. Listen actively. React like a human: "Good point", "Hmm, not quite", "Can you elaborate?"
-- NEVER teach or explain the correct answer. Your job is to assess, not tutor. If they get it wrong, note it and move on.
-- Probe deeper when answers are vague: "Why that approach?", "What are the trade-offs?", "What breaks at scale?"
-- If they say "I don't know" or give a weak answer, acknowledge briefly ("No worries, let's try another area") and move on. Never explain what they missed.
-
-SCORING — rate every answer internally (Strong/Adequate/Weak). At the end, give a final summary with per-topic scores (1-5) and overall recommendation.
-
-RULES:
-- Always call open_file with the exact filePath/lineStart/lineEnd before asking about specific code.
-- Ask ONE question at a time. Wait for the answer. Do not stack questions.
-- Do NOT explain concepts. Do NOT give the answer. Assess only.
-- When you have covered enough, call end_interview.
-- Keep spoken turns SHORT — 2-3 sentences max. This is a live voice conversation.`;
-
-    const provider = new OpenAIRealtimeProvider({
-      baseUrl: config.realtime.baseUrl,
-      model: config.realtime.model,
-      apiKey,
-      voice: config.realtime.voice,
-      instructions,
-      inputFormat: config.realtime.inputFormat,
-      outputFormat: config.realtime.outputFormat,
-      sampleRate: config.realtime.sampleRate,
-      turnDetection: config.realtime.turnDetection,
-      tools: [OPEN_FILE_TOOL, END_INTERVIEW_TOOL],
-    });
-    this.provider = provider;
-
-    provider.on('log', (m) => {
-      onEvent({ kind: 'log', text: m });
-      logger.log(`[realtime] ${m}`);
-    });
-    provider.on('error', (err) => {
-      onEvent({ kind: 'error', text: err.message });
-      logger.error(`[realtime] ${err.message}`);
-    });
-
-    provider.on('speech_started', () => {
-      this.playback?.stop();
-      this.setState('listening', onEvent);
-    });
-    provider.on('speech_stopped', () => {
-      this.setState('thinking', onEvent);
-    });
-
-    provider.on('audio_delta', (chunk: Buffer) => {
-      this.setState('speaking', onEvent);
-      this.playback?.feed(chunk);
-    });
-    provider.on('audio_done', () => {
-      this.playback?.flush();
-    });
-
-    provider.on('transcript_delta', (t) => {
-      onEvent({ kind: 'agent_message', text: t });
-    });
-    provider.on('transcript_done', (t) => {
-      if (t) onEvent({ kind: 'agent_message', text: t });
-    });
-    provider.on('text_delta', (t) => {
-      onEvent({ kind: 'agent_message', text: t });
-    });
-    provider.on('text_done', (t) => {
-      if (t) onEvent({ kind: 'agent_message', text: t });
-    });
-
-    provider.on('function_call', async (call) => {
-      if (call.name === 'open_file') {
-        try {
-          const args = JSON.parse(call.arguments || '{}');
-          const filePath = String(args.filePath ?? '');
-          const lineStart = Number(args.lineStart ?? 1);
-          const lineEnd = Number(args.lineEnd ?? lineStart);
-          if (!filePath) {
-            provider.submitToolResult(call.callId, { ok: false, error: 'filePath required' });
-            return;
-          }
-          const ed = await openAndHighlight({ filePath, lineStart, lineEnd }, workspaceRoot);
-          onEvent({
-            kind: 'file_opened',
-            filePath,
-            lineStart,
-            lineEnd,
-            text: ed ? `Opened ${filePath}:${lineStart}-${lineEnd}` : `Could not open ${filePath}`,
-          });
-          this.questionCount += 1;
-          onEvent({ kind: 'question_count', text: String(this.questionCount) });
-          if (config.interview.maxQuestions > 0 && this.questionCount >= config.interview.maxQuestions) {
-            provider.submitToolResult(call.callId, {
-              ok: !!ed,
-              note: 'Maximum question count reached. Please wrap up with end_interview.',
-            });
-          } else {
-            provider.submitToolResult(call.callId, { ok: !!ed });
-          }
-        } catch (e) {
-          provider.submitToolResult(call.callId, { ok: false, error: (e as Error).message });
-        }
-      } else if (call.name === 'end_interview') {
-        provider.submitToolResult(call.callId, { ok: true });
-        onEvent({ kind: 'log', text: 'Interview ending per agent request.' });
-        this.setState('ended', onEvent);
-        this.cancelled = true;
-      } else {
-        provider.submitToolResult(call.callId, { ok: false, error: `Unknown tool: ${call.name}` });
-      }
-    });
-
-    try {
-      await provider.connect();
-    } catch (e) {
-      onEvent({ kind: 'error', text: `Failed to connect to Realtime API: ${(e as Error).message}` });
-      this.setState('idle', onEvent);
-      return;
-    }
-
-    this.playback = new AudioPlayback({
-      sampleRate: config.realtime.sampleRate,
-      channels: 1,
-      ffmpegPath: config.audio.ffmpegPath,
-    });
-    this.playback.start();
-
-    this.mic = new MicCapture({
-      ffmpegPath: config.audio.ffmpegPath,
-      sampleRate: config.realtime.sampleRate,
-      channels: 1,
-      inputDevice: config.audio.inputDevice || undefined,
-    });
-    this.mic.on('error', (err) => {
-      onEvent({ kind: 'error', text: `Mic error: ${err.message}` });
-      logger.error(`[mic] ${err.message}`);
-    });
-    this.mic.on('log', (l) => logger.log(`[mic] ${l}`));
-    this.mic.on('data', (chunk: Buffer) => {
-      if (!this.cancelled) provider.sendAudio(chunk);
-    });
-    this.mic.start();
-
-    this.setState('listening', onEvent);
-    onEvent({ kind: 'log', text: 'Ask Me Anything is live (realtime mode). Speak naturally — say "stop" or use the Stop command to end.' });
-
-    const openingText = opts.priorTranscript && opts.priorTranscript.length > 0
-      ? `Resume Ask Me Anything now. Greet the user briefly, acknowledge you're continuing, then ask the next question. Do NOT repeat previous questions.`
-      : `Begin Ask Me Anything now. Greet the user briefly, then call open_file for the first topic and ask your first knowledge-check question.`;
-
-    provider.sendText(openingText);
-
-    await this.waitCancelled(opts);
-    await this.stop(onEvent);
-  }
-
-  // ─── Chained mode (PortAudio mic → STT → chat → TTS → webview playback) ─
 
   private async startChained(opts: InterviewStartOptions): Promise<void> {
     const { config, context, workspaceRoot, onEvent, agent, agentConfig } = opts;
@@ -500,7 +263,7 @@ RULES:
     }
   }
 
-  /** Synthesize text via TTS and play via ffplay. Pauses mic during playback to prevent feedback.
+  /** Synthesize text via TTS and play via webview. Pauses mic during playback to prevent feedback.
    *  Does NOT transition state after playback — caller decides next state (listening/ended). */
   private async speakText(text: string, onEvent: (e: InterviewEvent) => void): Promise<void> {
     if (!this.chained) return;
@@ -520,26 +283,10 @@ RULES:
     }
   }
 
-  /** Play mp3 buffer through ffplay, blocking until playback completes. */
+  /** Play mp3 buffer through the webview audio element, blocking until playback completes. */
   private async playMp3Blocking(mp3: Buffer): Promise<void> {
-    const { spawn } = require('child_process');
-    const cfg = await import('../config').then((m) => m.loadConfig());
-    const ffplay = cfg.audio.ffmpegPath.replace(/ffmpeg(\.exe)?$/i, 'ffplay$1');
-    return new Promise<void>((resolve) => {
-      const p = spawn(ffplay, ['-nodisp', '-autoexit', '-nostats', '-loglevel', 'quiet', '-i', 'pipe:0'], {
-        stdio: ['pipe', 'ignore', 'ignore'],
-        windowsHide: true,
-      });
-      p.on('error', (err: Error) => {
-        logger.error(`[tts] ffplay error: ${err.message}`);
-        resolve();
-      });
-      p.on('exit', () => resolve());
-      try {
-        p.stdin?.write(mp3);
-        p.stdin?.end();
-      } catch { resolve(); }
-    });
+    if (!this.homeView) return;
+    await this.homeView.playAudioBlob(mp3.toString('base64'), 'audio/mp3');
   }
 
   private async waitCancelled(opts: InterviewStartOptions): Promise<void> {
@@ -563,35 +310,52 @@ RULES:
     if (s === 'listening' && prev !== 'listening' && !this.cancelled) {
       const cfg = vscode.workspace.getConfiguration('interviewLele');
       const beepEnabled = cfg.get('audio.beepEnabled', true);
-      if (beepEnabled) {
-        const ffmpegPath = cfg.get('audio.ffmpegPath', 'ffmpeg');
-        playListeningBeep(ffmpegPath);
+      if (beepEnabled && this.homeView) {
+        playListeningBeep(this.homeView);
         logger.log('[beep] Playing listening beep');
       }
     }
   }
 
+  /**
+   * Stop immediately: flip cancelled, emit 'ended' state, persist session,
+   * then tear down ACP / TTS / STT / mic / playback in the background.
+   * Reports per-step progress via onEvent so the UI can show status dots.
+   * Idempotent — safe to call multiple times.
+   */
   async stop(onEvent?: (e: InterviewEvent) => void): Promise<void> {
+    if (this.cancelled && this.state === 'ended') return; // already stopped
     this.cancelled = true;
-    // Persist final session state before tearing down
-    this.persistSession();
-    try { await this.mic?.stop(); } catch { /* ignore */ }
-    try { await this.paMic?.stop(); } catch { /* ignore */ }
-    try { await this.playback?.stop(); } catch { /* ignore */ }
-    try { await this.provider?.disconnect(); } catch { /* ignore */ }
-    try { await this.chained?.disposeAcp(); } catch { /* ignore */ }
+    // Emit 'ended' immediately so the UI responds instantly
+    if (onEvent) this.setState('ended', onEvent);
+    // Persist transcript synchronously (fast, non-blocking)
+    try { this.persistSession(); } catch { /* ignore */ }
+    // Tear down everything in the background — does not block the caller
+    void this.tearDown(onEvent);
+  }
+
+  /**
+   * Background teardown: stops each live component (ACP agent, TTS, STT,
+   * mic, playback, realtime WebSocket) one by one, emitting a log event
+   * after each so the webview can animate status dots.
+   */
+  private async tearDown(onEvent?: (e: InterviewEvent) => void): Promise<void> {
+    const steps: Array<{ label: string; fn: () => Promise<void> | void }> = [
+      { label: 'portaudio', fn: async () => { try { await this.paMic?.stop(); } catch { /* ignore */ } } },
+      { label: 'acp', fn: async () => { try { await this.chained?.disposeAcp(); } catch { /* ignore */ } } },
+    ];
+    for (const step of steps) {
+      try { await step.fn(); } catch { /* ignore */ }
+      onEvent?.({ kind: 'log', text: `stopped ${step.label}` });
+    }
     if (this.homeView) {
       this.homeView.stopListening();
       this.homeView.onAudio = null;
       this.homeView.onRequestOpening = null;
     }
-    this.mic = null;
     this.paMic = null;
-    this.playback = null;
-    this.provider = null;
     this.chained = null;
     this.acpClient = null;
     clearHighlights();
-    if (onEvent) this.setState('ended', onEvent);
   }
 }

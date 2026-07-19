@@ -6,8 +6,7 @@ import { InterviewOrchestrator, InterviewEvent } from './interview/orchestrator'
 import { gatherCodebaseContext } from './acp/context';
 import { DiscoveredAgent } from './acp/registry';
 import { CodebaseContext } from './types';
-import { MicCapture } from './audio/capture';
-import { AudioPlayback } from './audio/playback';
+
 import { logger } from './logger';
 import { getAgentConfig, initAgentConfigStorage } from './acp/agentConfigUi';
 import { loadSession, saveSession, clearSession, StoredSession } from './interview/sessionStore';
@@ -80,14 +79,6 @@ async function startInterview(context: vscode.ExtensionContext, operationToken: 
   }
 
   const cfg = loadConfig();
-  if (cfg.voiceMode === 'realtime' && !cfg.realtime.apiKey) {
-    const open = await vscode.window.showErrorMessage(
-      'No Realtime API key configured. Set interviewLele.realtime.apiKey (or OPENAI_API_KEY env var), or switch voiceMode to auto/chained.',
-      'Open Settings'
-    );
-    if (open) vscode.commands.executeCommand('workbench.action.openSettings', 'interviewLele');
-    return;
-  }
 
   // Ensure agents are discovered
   if (homeView) {
@@ -279,11 +270,16 @@ async function stopActiveOperation(): Promise<void> {
   if (!operation || operation.stopping) return;
   operation.stopping = true;
   homeView?.setOperation(operation.kind, 'cancelling', operation.kind === 'guide' ? 'Stopping guide generation…' : 'Stopping Ask Me Anything…');
+  // Cancel the token first so any in-flight analysis/ACP calls bail out
   operation.source.cancel();
   if (operation.kind === 'interview' && orchestrator) {
+    // orchestrator.stop() is now non-blocking — emits 'ended' immediately
+    // and tears down ACP/TTS/STT/mic in the background with progress logs
     await orchestrator.stop((e) => homeView?.postEvent(e));
     homeView?.setInterviewState('ended');
   }
+  // Finish the operation so the UI exits the 'cancelling' phase
+  finishOperation(operation);
 }
 
 async function createTutorGuide(): Promise<void> {
@@ -501,43 +497,21 @@ async function testMic(): Promise<void> {
 
 async function testSpeaker(): Promise<void> {
   const cfg = loadConfig();
-  homeView?.setAudioTest('speakerTest', 'testing', 'Playing test audio…');
+  const hv = homeView;
+  hv?.setAudioTest('speakerTest', 'testing', 'Playing test audio…');
   // Try Kokoro TTS first — say a short phrase
   logger.log(`Testing TTS via ${cfg.tts.baseUrl}${cfg.tts.path} (voice=${cfg.tts.voice})...`);
   try {
     const { ChainedVoiceProvider } = await import('./realtime/chained');
     const chained = new ChainedVoiceProvider(cfg);
     const mp3 = await chained.synthesize('Hello, this is a test of the text to speech system.');
-    logger.log(`TTS returned ${mp3.length} bytes. Playing via ffplay...`);
-    const { spawn } = require('child_process');
-    const ffplay = cfg.audio.ffmpegPath.replace(/ffmpeg(\.exe)?$/i, 'ffplay$1');
-    await new Promise<void>((resolve, reject) => {
-      const p = spawn(ffplay, ['-nodisp', '-autoexit', '-nostats', '-loglevel', 'quiet', '-i', 'pipe:0'], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true });
-      p.on('error', reject);
-      p.on('exit', (code: number | null) => code === 0 ? resolve() : reject(new Error(`ffplay exited with code ${code}`)));
-      p.stdin?.write(mp3);
-      p.stdin?.end();
-    });
+    logger.log(`TTS returned ${mp3.length} bytes. Playing via webview...`);
+    if (!hv) throw new Error('Webview not available for playback');
+    await hv.playAudioBlob(mp3.toString('base64'), 'audio/mp3');
     logger.log('TTS test complete. If you heard speech, Kokoro TTS works.');
-    homeView?.setAudioTest('speakerTest', 'success', 'Playback completed');
+    hv.setAudioTest('speakerTest', 'success', 'Playback completed');
   } catch (e) {
     logger.error(`TTS test failed: ${(e as Error).message}`);
-    logger.log('Falling back to tone test...');
-    const pb = new AudioPlayback({ sampleRate: cfg.realtime.sampleRate, channels: 1, ffmpegPath: cfg.audio.ffmpegPath });
-    try {
-      pb.start();
-      const sr = cfg.realtime.sampleRate;
-      const buf = Buffer.alloc(sr * 2);
-      for (let i = 0; i < sr; i++) {
-        const v = Math.sin((2 * Math.PI * 440 * i) / sr) * 0.2 * 32767;
-        buf.writeInt16LE(Math.round(v), i * 2);
-      }
-      pb.feed(buf);
-      await pb.flush();
-      logger.log('Tone test done.');
-      homeView?.setAudioTest('speakerTest', 'success', 'Fallback tone completed');
-    } catch (fallbackError) {
-      homeView?.setAudioTest('speakerTest', 'failure', (fallbackError as Error).message);
-    }
+    hv?.setAudioTest('speakerTest', 'failure', (e as Error).message);
   }
 }
