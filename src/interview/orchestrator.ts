@@ -340,13 +340,13 @@ RULES:
       return;
     }
 
-    // PortAudio mic capture with VAD — always use system default device
+    // PortAudio mic capture with VAD — use the configured device or system default.
     const silenceMs = Math.round(config.audio.silenceSeconds * 1000);
 
     this.paMic = new PortAudioMicCapture({
       sampleRate: 16000,
       channels: 1,
-      deviceId: -1, // -1 = system default
+      deviceId: config.audio.inputDeviceId,
       silenceMs,
       minSpeechMs: 200,
       maxSpeechMs: 60000,
