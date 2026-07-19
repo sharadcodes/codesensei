@@ -15,7 +15,7 @@ export interface GatherOptions {
 }
 
 /**
- * Spins up the ACP agent, asks it to produce a structured interview-relevant
+ * Spins up the ACP agent, asks it to produce structured codebase learning
  * summary of the codebase, and parses the JSON result.
  */
 export async function gatherCodebaseContext(opts: GatherOptions): Promise<CodebaseContext> {
