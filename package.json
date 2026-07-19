@@ -3,7 +3,7 @@
   "displayName": "CodeSensei",
   "description": "Learn any codebase with AI, then test your understanding through a live, voice-driven Knowledge Check session.",
   "version": "0.1.0",
-  "publisher": "sharadcodes",
+  "publisher": "sharadcodes--g-savitha--iamnabina",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -34,7 +34,7 @@
     "stt",
     "tts"
   ],
-  "icon": "logo.png",
+  "icon": "media/codesensei-marketplace.png",
   "galleryBanner": {
     "color": "#1a1a2e",
     "theme": "dark"
