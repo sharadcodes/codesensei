@@ -131,6 +131,21 @@ All settings live under the `AI CodeSensei.*` namespace. Open Settings (`Ctrl+,`
 - **Chained voice pipeline** — PortAudio mic capture → VAD → STT → LLM chat → TTS → webview playback. All components are swappable behind their interfaces.
 - **Source policy** — the Code Tutor guide generator creates a curated, read-only analysis workspace with only permitted files, preventing the agent from accessing secrets or irrelevant files.
 
+## Automated Marketplace releases
+
+Every push to `main` runs `.github/workflows/publish-marketplace.yml`. The workflow validates the extension, increments the patch version, builds separate Apple Silicon macOS, Intel macOS, x64 Linux, and x64 Windows VSIX packages, verifies their native architectures and runtime loading, and publishes all four packages to the VS Code Marketplace.
+
+Windows ARM64 and Linux ARM64 are not currently published because `naudiodon2` 2.5.0 bundles x64-only PortAudio libraries for those platforms. They must not reuse the x64 addon; support requires compatible ARM64 PortAudio libraries and matching native builds.
+
+Repository setup required:
+
+1. Create a Visual Studio Marketplace publishing token for the publisher in `package.json`.
+2. Add it as a GitHub Actions repository or `vscode-marketplace` environment secret named `VSCE_PAT`.
+3. In **Settings → Actions → General**, allow workflows to read and write repository contents.
+4. If `main` has branch protection, allow GitHub Actions to push the automated `chore(release)` version commit, or replace that step with your protected-branch release process.
+
+The publish job uses the `vscode-marketplace` GitHub environment. Add required reviewers to that environment if production releases should require approval; leave it unprotected for fully automatic publishing.
+
 ## License
 
 [MIT](LICENSE)

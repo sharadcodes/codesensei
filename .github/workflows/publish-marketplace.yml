@@ -1,0 +1,146 @@
+name: Publish VS Code Marketplace
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: marketplace-release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Test and bump version
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out triggering commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate extension
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Bump patch version
+        id: version
+        run: |
+          npm version patch --no-git-tag-version
+          VERSION="$(node -p 'require("./package.json").version')"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore(release): v${{ steps.version.outputs.version }} [skip release]"
+          git push origin HEAD:main
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-14
+          - target: darwin-x64
+            runner: macos-15-intel
+          - target: linux-x64
+            runner: ubuntu-24.04
+          - target: win32-x64
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    env:
+      npm_config_build_from_source: "true"
+    steps:
+      - name: Check out triggering commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply release version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Build native addon and extension
+        run: |
+          npm rebuild naudiodon2
+          npm run build
+
+      - name: Verify native architecture and runtime loading
+        run: |
+          node scripts/verify-native-arch.mjs "${{ matrix.target }}" dist/native/naudiodon.node
+          node -e "const addon = require('./dist/native/naudiodon.node'); if (typeof addon.create !== 'function') process.exit(1)"
+
+      - name: Package targeted VSIX
+        run: |
+          node -e "require('fs').mkdirSync('release', { recursive: true })"
+          npx vsce package --no-yarn --no-dependencies --target "${{ matrix.target }}" --out "release/ai-codesensei-${{ matrix.target }}-${{ needs.prepare.outputs.version }}.vsix"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.target }}
+          path: release/*.vsix
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish targeted VSIX files
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    environment: vscode-marketplace
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Download targeted VSIX files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: vsix-*
+          path: release
+          merge-multiple: true
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          test -n "$VSCE_PAT"
+          for vsix in release/*.vsix; do
+            npx vsce publish --packagePath "$vsix"
+          done
