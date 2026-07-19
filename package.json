@@ -42,6 +42,10 @@
       {
         "command": "interviewLele.testSpeaker",
         "title": "Interview Lele: Test Speaker (TTS)"
+      },
+      {
+        "command": "interviewLele.clearSession",
+        "title": "Interview Lele: Clear Cached Session"
       }
     ],
     "viewsContainers": {
@@ -230,7 +234,7 @@
         },
         "interviewLele.audio.silenceSeconds": {
           "type": "number",
-          "default": 2.0,
+          "default": 2,
           "description": "Seconds of silence before ending a speech segment. Higher = more patient (good for thoughtful answers), lower = snappier."
         },
         "interviewLele.audio.beepEnabled": {

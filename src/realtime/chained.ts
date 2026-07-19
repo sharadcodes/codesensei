@@ -59,6 +59,11 @@ export class ChainedVoiceProvider extends EventEmitter {
     return [...this.conversation];
   }
 
+  /** Seed the conversation history from a prior (resumed) interview session. */
+  seedTranscript(turns: ChainedTurn[]): void {
+    this.conversation.push(...turns);
+  }
+
   get count(): number {
     return this.questionCount;
   }
@@ -245,14 +250,23 @@ RULES:
       temperature: 0.7,
     };
 
+    logger.log(`[chat] POST ${url} model=${chat.model} apiKey=${chat.apiKey ? 'yes' : 'NO'}`);
     const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Chat failed (${res.status}): ${text.slice(0, 500)}`);
     }
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Chat returned no content.');
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string; refusal?: string } }>; error?: { message?: string; code?: string } };
+    if (json.error) {
+      throw new Error(`Chat API error: ${json.error.message ?? 'unknown'} (code: ${json.error.code ?? 'n/a'})`);
+    }
+    const choice = json.choices?.[0];
+    const content = choice?.message?.content;
+    if (!content) {
+      const raw = JSON.stringify(json).slice(0, 500);
+      logger.log(`[chat] Empty content. Full response: ${raw}`);
+      throw new Error(`Chat returned no content. Response: ${raw}`);
+    }
     return content;
   }
 
