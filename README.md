@@ -4,17 +4,20 @@ A VS Code extension that helps you understand a codebase, then tests your knowle
 
 ## What it does
 
-1. **Discovers ACP agents** (Codex, Devin, OpenCode, Gemini CLI, etc.) from the
+1. **Creates a Code Tutor guide** by reading the repository with your selected
+   ACP agent and generating `CODEBASE_TUTOR.md` with entry points, architecture,
+   control flow, setup instructions, key files, and safe first contributions.
+2. **Discovers ACP agents** (Codex, Devin, OpenCode, Gemini CLI, etc.) from the
    [Agent Client Protocol](https://agentclientprotocol.com/) registry plus any
    local registry at `~/.windsurf/acp/registry.json`.
-2. **Spins up the agent you pick** to read your codebase and produce a
+3. **Spins up the agent you pick** to read your codebase and produce a
    structured learning summary (key files + suggested knowledge-check topics with
    file/line ranges).
-3. **Starts a two-way Ask Me Anything session** using any OpenAI-compatible Realtime
+4. **Starts a two-way Ask Me Anything session** using any OpenAI-compatible Realtime
    API endpoint (STT + TTS + LLM on one WebSocket).
-4. As it talks, it **automatically opens files and highlights the exact code
+5. As it talks, it **automatically opens files and highlights the exact code
    range** it is asking about, so you see the relevant context.
-5. You answer out loud; the knowledge evaluator listens, acknowledges, and asks
+6. You answer out loud; the knowledge evaluator listens, acknowledges, and asks
    the next question to test how well you understand the codebase.
 
 ## Requirements

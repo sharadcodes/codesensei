@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 export type VoiceMode = 'auto' | 'realtime' | 'chained';
+export type TutorExplanationMode = 'quick' | 'guided' | 'deep';
 
 export interface RealtimeConfig {
   baseUrl: string;
@@ -72,6 +73,7 @@ export interface FullConfig {
   audio: AudioConfig;
   acp: AcpConfig;
   interview: InterviewConfig;
+  tutor: { explanationMode: TutorExplanationMode };
 }
 
 function resolveApiKey(settingKey: string, ...envFallbacks: string[]): string {
@@ -138,6 +140,7 @@ export function loadConfig(): FullConfig {
       maxQuestions: cfg.get('interview.maxQuestions', 0),
       difficulty: cfg.get('interview.difficulty', 'adaptive'),
     },
+    tutor: { explanationMode: cfg.get<TutorExplanationMode>('tutor.explanationMode', 'guided') },
   };
 }
 

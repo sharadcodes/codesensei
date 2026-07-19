@@ -162,6 +162,10 @@ export class PortAudioMicCapture extends EventEmitter {
 
   /** List available input devices, deduplicated by name. */
   static listInputDevices(): Array<{ id: number; name: string; maxInputChannels: number }> {
+    return this.getInputDevicesResult().devices;
+  }
+
+  static getInputDevicesResult(): { devices: Array<{ id: number; name: string; maxInputChannels: number }>; error?: string } {
     try {
       const pa = loadPortAudio();
       const all = pa.getDevices().filter((d: any) => d.maxInputChannels > 0);
@@ -173,10 +177,11 @@ export class PortAudioMicCapture extends EventEmitter {
         seen.add(d.name);
         unique.push({ id: d.id, name: d.name, maxInputChannels: d.maxInputChannels });
       }
-      return unique;
+      return { devices: unique };
     } catch (e) {
-      logger.error(`Failed to list PortAudio devices: ${(e as Error).message}`);
-      return [];
+      const error = (e as Error).message;
+      logger.error(`Failed to list PortAudio devices: ${error}`);
+      return { devices: [], error };
     }
   }
 
