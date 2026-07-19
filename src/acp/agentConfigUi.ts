@@ -136,14 +136,14 @@ export async function configureAgentMenu(
 
   const picked = await vscode.window.showQuickPick(actions, {
     placeHolder: `${agent.name} — configure`,
-    title: 'CodeSensei: ACP Agent Configuration',
+    title: 'AI CodeSensei: ACP Agent Configuration',
   });
   if (!picked) return;
 
   switch (picked.action) {
     case 'select':
       onSelect(agent);
-      vscode.window.showInformationMessage(`CodeSensei: selected agent "${agent.name}".`);
+      vscode.window.showInformationMessage(`AI CodeSensei: selected agent "${agent.name}".`);
       return;
 
     case 'model': {
@@ -164,7 +164,7 @@ export async function configureAgentMenu(
       } else {
         const pick = await vscode.window.showQuickPick(items, {
           placeHolder: 'Choose model',
-          title: 'CodeSensei: Agent Model',
+          title: 'AI CodeSensei: Agent Model',
         });
         chosen = pick?.model;
       }
@@ -183,7 +183,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose reasoning effort',
-        title: 'CodeSensei: Reasoning Effort',
+        title: 'AI CodeSensei: Reasoning Effort',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, reasoningEffort: pick.value as ReasoningEffort });
@@ -206,7 +206,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose scope / permission level',
-        title: 'CodeSensei: Agent Scope',
+        title: 'AI CodeSensei: Agent Scope',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, agentMode: pick.value as AgentMode });
@@ -229,7 +229,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose sandbox mode',
-        title: 'CodeSensei: Sandbox Mode',
+        title: 'AI CodeSensei: Sandbox Mode',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, sandboxMode: pick.value as SandboxMode });
@@ -252,7 +252,7 @@ export async function configureAgentMenu(
     }
 
     case 'capabilities': {
-      const out = vscode.window.createOutputChannel('CodeSensei: Agent Capabilities');
+      const out = vscode.window.createOutputChannel('AI CodeSensei: Agent Capabilities');
       out.show();
       out.appendLine(`Agent: ${agent.name} (${agent.id})`);
       out.appendLine(`Available: ${agent.available}`);
@@ -282,7 +282,7 @@ export async function configureAgentMenu(
       const r = agent.resolved;
       const cmd = `${r.cmd} ${r.args.join(' ')}`;
       const env = buildEnvPreview(config);
-      const out = vscode.window.createOutputChannel('CodeSensei: Agent Command');
+      const out = vscode.window.createOutputChannel('AI CodeSensei: Agent Command');
       out.show();
       out.appendLine(`Agent: ${agent.name} (${agent.id})`);
       out.appendLine(`Distribution: ${r.distributionType}`);
