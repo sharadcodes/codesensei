@@ -521,6 +521,20 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     background: transparent;
     border: none;
     box-shadow: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+  }
+  .modal-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    padding-right: 4px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
   .modal-header {
     display: flex;
@@ -559,8 +573,11 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     border-radius: 10px;
     margin-bottom: 10px;
     background: rgba(255, 255, 255, 0.01);
-    overflow: hidden;
+    overflow: visible;
     transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .modal-section.collapsed {
+    overflow: hidden;
   }
   .modal-section:hover {
     background: rgba(255, 255, 255, 0.03);
@@ -629,6 +646,11 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     font-family: inherit;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
     width: 100%;
+  }
+  .modal-field select {
+    position: relative;
+    z-index: 20;
+    appearance: auto;
   }
   .modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus {
     border-color: var(--vscode-focusBorder, var(--brand-2));
@@ -761,7 +783,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
         <h2>Settings</h2>
       </div>
 
-      <div style="flex: 1; overflow-y: auto; padding-right: 2px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+      <div class="modal-body">
 
         <div class="modal-section collapsed">
           <div class="modal-section-title">Session</div>
