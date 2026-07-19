@@ -154,10 +154,13 @@ export class AcpClient extends EventEmitter {
       if (!waiter) return;
       this.pending.delete(msg.id);
       const summary = msg.error
-        ? `error: ${msg.error.message ?? 'ACP error'}`
+        ? `error: ${msg.error.message ?? 'ACP error'} (code: ${msg.error.code ?? 'n/a'}${msg.error.data ? `, data: ${JSON.stringify(msg.error.data).slice(0, 300)}` : ''})`
         : `result: ${JSON.stringify(msg.result).slice(0, 200)}`;
       logger.log(`← ACP #${msg.id} ${summary}`);
-      if (msg.error) waiter.reject(new Error(msg.error.message || 'ACP error'));
+      if (msg.error) {
+        const detail = msg.error.data ? ` — ${JSON.stringify(msg.error.data).slice(0, 500)}` : '';
+        waiter.reject(new Error(`${msg.error.message || 'ACP error'} (code ${msg.error.code ?? 'n/a'})${detail}`));
+      }
       else waiter.resolve(msg.result);
       return;
     }
@@ -190,7 +193,16 @@ export class AcpClient extends EventEmitter {
   private request(method: string, params: any): Promise<unknown> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        if (this.pending.has(id)) {
+          this.pending.delete(id);
+          reject(new Error(`ACP ${method} timed out after 120s`));
+        }
+      }, 120_000);
+      this.pending.set(id, {
+        resolve: (v) => { clearTimeout(timer); resolve(v); },
+        reject: (e) => { clearTimeout(timer); reject(e); },
+      });
       this.send({ jsonrpc: '2.0', id, method, params });
     });
   }
@@ -226,6 +238,25 @@ export class AcpClient extends EventEmitter {
     }
     const res = (await this.request('session/new', params)) as { sessionId: string };
     return res.sessionId;
+  }
+
+  /**
+   * Load an existing session, replaying the full conversation history via
+   * `session/update` notifications before this resolves. Only call this if
+   * the agent advertised `agentCapabilities.loadSession === true` on
+   * `initialize` — the protocol says Clients MUST NOT call it otherwise.
+   */
+  async loadSession(sessionId: string, cwd: string, mcpServers: unknown[] = []): Promise<void> {
+    await this.request('session/load', { sessionId, cwd, mcpServers });
+  }
+
+  /**
+   * Resume an existing session without replaying prior messages (lighter
+   * weight than `session/load`). Only call this if the agent advertised
+   * `agentCapabilities.sessionCapabilities.resume` on `initialize`.
+   */
+  async resumeSession(sessionId: string, cwd: string, mcpServers: unknown[] = []): Promise<unknown> {
+    return this.request('session/resume', { sessionId, cwd, mcpServers });
   }
 
   async prompt(sessionId: string, prompt: Array<Record<string, unknown>>): Promise<{ stopReason: string }> {
