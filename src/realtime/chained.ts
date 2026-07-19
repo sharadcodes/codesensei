@@ -28,9 +28,21 @@ export class ChainedVoiceProvider extends EventEmitter {
   private maxQuestions = 0;
   private acpClient: AcpClient | null = null;
   private acpSessionId: string | null = null;
+  /** Aborts any in-flight STT/TTS/chat fetch so "Stop" takes effect immediately
+   *  instead of waiting for a slow network response to resolve. */
+  private abortController = new AbortController();
 
   constructor(private cfg: FullConfig) {
     super();
+  }
+
+  /** Cancel any in-flight STT/TTS/chat request and arm a fresh controller for future calls. */
+  abort(): void {
+    this.abortController.abort();
+    this.abortController = new AbortController();
+    if (this.acpClient && this.acpSessionId) {
+      void this.acpClient.cancel(this.acpSessionId).catch(() => { /* ignore */ });
+    }
   }
 
   /** Set the ACP client + session to use for chat (instead of HTTP API). */
@@ -59,6 +71,11 @@ export class ChainedVoiceProvider extends EventEmitter {
     return [...this.conversation];
   }
 
+  /** Seed the conversation history from a prior (resumed) interview session. */
+  seedTranscript(turns: ChainedTurn[]): void {
+    this.conversation.push(...turns);
+  }
+
   get count(): number {
     return this.questionCount;
   }
@@ -74,7 +91,7 @@ export class ChainedVoiceProvider extends EventEmitter {
     const formData = buildMultipart(audio, format, stt.model, stt.language);
     const headers: Record<string, string> = { 'Content-Type': `multipart/form-data; boundary=${formData.boundary}` };
     if (stt.apiKey && stt.apiKey !== 'not-needed') headers['Authorization'] = `Bearer ${stt.apiKey}`;
-    const res = await fetch(url, { method: 'POST', headers, body: formData.body });
+    const res = await fetch(url, { method: 'POST', headers, body: formData.body, signal: this.abortController.signal });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`STT failed (${res.status}): ${text.slice(0, 500)}`);
@@ -93,7 +110,7 @@ export class ChainedVoiceProvider extends EventEmitter {
       model: tts.model,
       input: text,
       voice: tts.voice,
-      response_format: 'mp3',
+      response_format: tts.responseFormat || 'wav',
     };
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (tts.apiKey && tts.apiKey !== 'not-needed') headers['Authorization'] = `Bearer ${tts.apiKey}`;
@@ -101,6 +118,7 @@ export class ChainedVoiceProvider extends EventEmitter {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: this.abortController.signal,
     });
     if (!res.ok) {
       // Kokoro may not support `instructions`; retry without
@@ -119,7 +137,7 @@ export class ChainedVoiceProvider extends EventEmitter {
 
   /** Internal: generate the interviewer response without pushing candidate text to history. */
   private async generateTurn(candidateText: string): Promise<{ text: string; openFile?: { filePath: string; lineStart: number; lineEnd: number }; endInterview?: boolean }> {
-    const systemPrompt = `You are a senior engineering interviewer conducting a live, voice-based technical interview about THIS codebase:
+    const systemPrompt = `You are a friendly, rigorous codebase knowledge evaluator running a live, voice-based Knowledge Check session about THIS codebase:
 
 PROJECT SUMMARY:
 ${this.contextSummary}
@@ -127,10 +145,10 @@ ${this.contextSummary}
 KEY FILES:
 ${this.filesBrief}
 
-SUGGESTED INTERVIEW TOPICS:
+SUGGESTED KNOWLEDGE-CHECK TOPICS:
 ${this.topicsBrief}
 
-INTERVIEWER PERSONA — behave like a real human interviewer:
+KNOWLEDGE EVALUATOR — behave like a curious, supportive technical peer:
 - Speak naturally and concisely, as if on a phone/video call. No bullet points, no lectures, no markdown.
 - Begin with a brief warm greeting, then dive in. One question at a time.
 - Listen actively. React to the candidate's answer like a human: "Good point", "Hmm, not quite", "Interesting — can you elaborate?"
@@ -143,7 +161,7 @@ SCORING — after every candidate answer, internally rate it:
 - Strong: correct, clear, shows depth
 - Adequate: mostly right, some gaps
 - Weak: incorrect, vague, or "I don't know"
-Keep a running mental tally. At the end of the interview, give a final summary with per-topic scores (1-5) and overall recommendation.
+Keep a running mental tally. At the end, give a final summary with per-topic understanding scores (1-5), strengths, and areas to revisit.
 
 RULES:
 - Ask ONE question at a time. Wait for the answer. Do not stack questions.
@@ -202,7 +220,7 @@ RULES:
     // Build the prompt with system instructions + candidate's answer
     const prompt = [
       { type: 'text', text: systemPrompt },
-      { type: 'text', text: `The candidate just said: "${candidateText}"\n\nRespond as the interviewer. Remember: short, natural, one question at a time. Use <open_file>...</open_file> to focus on code, <end_interview/> to end.` },
+      { type: 'text', text: `The user just said: "${candidateText}"\n\nRespond as the knowledge evaluator. Remember: short, natural, one question at a time. Use <open_file>...</open_file> to focus on code, <end_interview/> to end.` },
     ];
 
     let collected = '';
@@ -245,20 +263,29 @@ RULES:
       temperature: 0.7,
     };
 
-    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    logger.log(`[chat] POST ${url} model=${chat.model} apiKey=${chat.apiKey ? 'yes' : 'NO'}`);
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: this.abortController.signal });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Chat failed (${res.status}): ${text.slice(0, 500)}`);
     }
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const content = json.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Chat returned no content.');
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string; refusal?: string } }>; error?: { message?: string; code?: string } };
+    if (json.error) {
+      throw new Error(`Chat API error: ${json.error.message ?? 'unknown'} (code: ${json.error.code ?? 'n/a'})`);
+    }
+    const choice = json.choices?.[0];
+    const content = choice?.message?.content;
+    if (!content) {
+      const raw = JSON.stringify(json).slice(0, 500);
+      logger.log(`[chat] Empty content. Full response: ${raw}`);
+      throw new Error(`Chat returned no content. Response: ${raw}`);
+    }
     return content;
   }
 
   /** Generate the opening greeting + first question. Does NOT push a fake candidate message to history. */
   async opening(): Promise<{ text: string; openFile?: { filePath: string; lineStart: number; lineEnd: number } }> {
-    return this.generateTurn('Begin the interview now. Greet the candidate briefly, then open the first file and ask your first question.');
+    return this.generateTurn('Begin the Knowledge Check now. Greet the user briefly, then open the first file and ask your first knowledge-check question.');
   }
 
   /** Clean up ACP session if active. */
