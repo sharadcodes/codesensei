@@ -1,9 +1,9 @@
 {
-  "name": "interview-lele",
-  "displayName": "Interview Lele",
-  "description": "Voice-driven technical interview using ACP agents to understand your codebase, then asks you questions by opening files, highlighting code, and talking to you in real time.",
+  "name": "codebase-tutor",
+  "displayName": "Codebase Tutor",
+  "description": "Learn a codebase with AI, then use Ask Me Anything to test your understanding through a live, code-aware conversation.",
   "version": "0.1.0",
-  "publisher": "interview-lele",
+  "publisher": "codebase-tutor",
   "license": "MIT",
   "engines": {
     "vscode": "^1.90.0"
@@ -21,38 +21,42 @@
     "commands": [
       {
         "command": "interviewLele.startInterview",
-        "title": "Interview Lele: Start Interview"
+        "title": "Codebase Tutor: Start Ask Me Anything"
       },
       {
         "command": "interviewLele.stopInterview",
-        "title": "Interview Lele: Stop Interview"
+        "title": "Codebase Tutor: Stop Active Operation"
       },
       {
         "command": "interviewLele.showLogs",
-        "title": "Interview Lele: Show Logs"
+        "title": "Codebase Tutor: Show Logs"
       },
       {
         "command": "interviewLele.refreshAgents",
-        "title": "Interview Lele: Refresh ACP Agents"
+        "title": "Codebase Tutor: Refresh ACP Agents"
       },
       {
         "command": "interviewLele.testMic",
-        "title": "Interview Lele: Test Microphone"
+        "title": "Codebase Tutor: Test Microphone"
       },
       {
         "command": "interviewLele.testSpeaker",
-        "title": "Interview Lele: Test Speaker (TTS)"
+        "title": "Codebase Tutor: Test Speaker (TTS)"
       },
       {
         "command": "interviewLele.clearSession",
-        "title": "Interview Lele: Clear Cached Session"
+        "title": "Codebase Tutor: Clear Cached Session"
+      },
+      {
+        "command": "codebaseTutor.generateGuide",
+        "title": "Codebase Tutor: Generate Codebase Guide"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "interviewLele",
-          "title": "Interview Lele",
+          "title": "Codebase Tutor",
           "icon": "media/icon.svg"
         }
       ]
@@ -68,7 +72,7 @@
     },
     "menus": {},
     "configuration": {
-      "title": "Interview Lele",
+      "title": "Codebase Tutor",
       "properties": {
         "interviewLele.voiceMode": {
           "type": "string",
@@ -112,8 +116,8 @@
         },
         "interviewLele.realtime.instructions": {
           "type": "string",
-          "default": "You are a senior engineering interviewer conducting a live, voice-based technical interview. Ask one focused question at a time about the code the candidate has open. Be curious, friendly, and rigorous. When the candidate answers, acknowledge briefly and ask a natural follow-up or move to a new area. Keep turns short and conversational.",
-          "description": "System instructions for the interviewer persona."
+          "default": "You are a friendly, rigorous codebase knowledge evaluator running a live, voice-based Ask Me Anything session. Ask the user one focused question at a time about the code they have open. When they answer, acknowledge briefly and ask a natural follow-up or move to a new area. Keep turns short and conversational.",
+          "description": "System instructions for the Ask Me Anything evaluator."
         },
         "interviewLele.realtime.inputFormat": {
           "type": "string",
@@ -206,7 +210,7 @@
         "interviewLele.chat.model": {
           "type": "string",
           "default": "openai/gpt-5.6",
-          "description": "Chat model for interview orchestration in chained mode."
+          "description": "Chat model for Ask Me Anything orchestration in chained mode."
         },
         "interviewLele.chat.apiKey": {
           "type": "string",
@@ -255,8 +259,8 @@
         },
         "interviewLele.acp.contextPrompt": {
           "type": "string",
-          "default": "You are analyzing this codebase to help prepare a technical interview of the author. Produce a concise structured summary covering: (1) the project's purpose and tech stack, (2) the most important files and why they matter, (3) the trickiest or most interesting code areas worth probing in an interview, and (4) 5-10 candidate interview topics each tied to a specific file path and a short rationale. Return the result as JSON with keys: summary, files (array of {path, role}), topics (array of {title, filePath, lineStart, lineEnd, rationale}).",
-          "description": "Prompt sent to the ACP agent to extract interview-relevant context."
+          "default": "You are analyzing this codebase so its user can learn it and test their understanding. Produce a concise structured summary covering: (1) the project's purpose and tech stack, (2) the most important files and why they matter, (3) the trickiest or most interesting code areas worth understanding, and (4) 5-10 knowledge-check topics each tied to a specific file path and a short rationale. Return the result as JSON with keys: summary, files (array of {path, role}), topics (array of {title, filePath, lineStart, lineEnd, rationale}).",
+          "description": "Prompt sent to the ACP agent to extract codebase learning and knowledge-check context."
         },
         "interviewLele.acp.customAgents": {
           "type": "array",
@@ -304,6 +308,12 @@
             "staff"
           ],
           "default": "adaptive"
+        },
+        "interviewLele.tutor.explanationMode": {
+          "type": "string",
+          "enum": ["quick", "guided", "deep"],
+          "default": "guided",
+          "description": "Default Code Tutor guide depth: Quick Overview, Guided Walkthrough, or Deep Dive."
         }
       }
     }
@@ -313,6 +323,7 @@
     "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:naudiodon2 --format=cjs --platform=node --target=node18 --sourcemap && node scripts/copy-native.mjs",
     "watch": "npm run build -- --watch",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/check-webview.mjs && node --test scripts/source-policy.test.mjs",
     "package": "vsce package --no-yarn --no-dependencies --allow-missing-repository"
   },
   "devDependencies": {

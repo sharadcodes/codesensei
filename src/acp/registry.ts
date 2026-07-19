@@ -481,7 +481,7 @@ export async function probeInitializeAndSession(resolved: ResolvedAgentCommand):
           terminal: false,
           session: { configOptions: { boolean: {} } },
         },
-        clientInfo: { name: 'interview-lele', title: 'Interview Lele', version: '0.1.0' },
+        clientInfo: { name: 'codebase-tutor', title: 'Codebase Tutor', version: '0.1.0' },
       },
     });
   });
