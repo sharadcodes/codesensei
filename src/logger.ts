@@ -11,7 +11,7 @@ class Logger {
 
   init(): void {
     if (!this.channel) {
-      this.channel = vscode.window.createOutputChannel('CodeSensei');
+      this.channel = vscode.window.createOutputChannel('AI CodeSensei');
     }
   }
 

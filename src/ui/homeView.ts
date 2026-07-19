@@ -395,7 +395,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; media-src blob: data:; font-src ${webview.cspSource};" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CodeSensei</title>
+<title>AI CodeSensei</title>
 <style>
   @font-face { font-family: 'Poppins'; font-style: normal; font-weight: 400; src: url('${fontUri('poppins-400.ttf')}') format('truetype'); }
   @font-face { font-family: 'Poppins'; font-style: normal; font-weight: 500; src: url('${fontUri('poppins-500.ttf')}') format('truetype'); }
@@ -718,7 +718,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
 <body>
   <header class="app-header">
     <div class="brand-mark">${logoSvg}</div>
-    <div class="brand-copy"><h1>CodeSensei</h1></div>
+    <div class="brand-copy"><h1>AI CodeSensei</h1></div>
     <span id="state-badge" class="state-badge" data-state="idle">idle</span>
   </header>
   <div class="credits">Built with ❤ by <a href="https://github.com/sharadcodes" target="_blank" rel="noopener">sharadcodes</a> · <a href="https://github.com/g-savitha" target="_blank" rel="noopener">g-savitha</a> · <a href="https://github.com/iamnabina" target="_blank" rel="noopener">iamnabina</a></div>
@@ -1234,7 +1234,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     div.className = 'msg ' + entry.kind;
     const who = document.createElement('div');
     who.className = 'who';
-    who.textContent = { agent: 'CodeSensei', user: 'You', file: 'file', system: 'system', error: 'error' }[entry.kind] || entry.kind;
+    who.textContent = { agent: 'AI CodeSensei', user: 'You', file: 'file', system: 'system', error: 'error' }[entry.kind] || entry.kind;
     div.appendChild(who);
     const body = document.createElement('div');
     body.textContent = entry.text;
