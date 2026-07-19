@@ -2,7 +2,7 @@
   "name": "ai-codesensei",
   "displayName": "AI CodeSensei",
   "description": "Learn any codebase with AI, then test your understanding through a live, voice-driven Knowledge Check session.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "sharadcodes--g-savitha--iamnabina",
   "license": "MIT",
   "repository": {
