@@ -16,7 +16,7 @@ let homeView: HomeViewProvider | null = null;
 
 export function activate(context: vscode.ExtensionContext): void {
   logger.init();
-  logger.log('Interview Lele extension activating.');
+  logger.log('Codebase Tutor extension activating.');
   initAgentConfigStorage(context.globalState);
 
   homeView = new HomeViewProvider(context.extensionUri);
@@ -43,7 +43,7 @@ export function deactivate(): void {
 
 async function startInterview(context: vscode.ExtensionContext): Promise<void> {
   if (orchestrator && orchestrator.currentState !== 'idle' && orchestrator.currentState !== 'ended') {
-    vscode.window.showWarningMessage('Interview already in progress.');
+    vscode.window.showWarningMessage('Ask Me Anything is already in progress.');
     homeView?.show();
     return;
   }
@@ -97,7 +97,7 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
       homeView?.setLastFile(e.filePath);
       logger.log(`Opened file ${e.filePath}:${e.lineStart}-${e.lineEnd}`);
     }
-    if (e.kind === 'agent_message' && e.text) logger.log(`Interviewer: ${e.text}`);
+    if (e.kind === 'agent_message' && e.text) logger.log(`Knowledge evaluator: ${e.text}`);
     if (e.kind === 'error' && e.text) logger.error(e.text);
     if (e.kind === 'log' && e.text) logger.log(e.text);
   };
@@ -112,7 +112,7 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
       codebaseContext = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: `Interview Lele: ${agent.name} is analyzing the codebase`,
+          title: `Codebase Tutor: ${agent.name} is analyzing the codebase`,
           cancellable: true,
         },
         async (progress, token) => {
@@ -160,7 +160,7 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
 async function stopInterview(): Promise<void> {
   if (!orchestrator) return;
   await orchestrator.stop((e) => homeView?.postEvent(e));
-  homeView?.postStatus('Interview stopped.');
+  homeView?.postStatus('Ask Me Anything stopped.');
   homeView?.setInterviewState('ended');
 }
 
@@ -213,7 +213,7 @@ async function fallbackContext(workspaceRoot: string): Promise<CodebaseContext> 
 
   await walk(workspaceRoot, 0);
   return {
-    summary: `Workspace at ${workspaceRoot}. No ACP agent was used; the interviewer will work from a shallow file scan of ${files.length} source files.`,
+    summary: `Workspace at ${workspaceRoot}. No ACP agent was used; Ask Me Anything will work from a shallow file scan of ${files.length} source files.`,
     files,
     topics,
   };
