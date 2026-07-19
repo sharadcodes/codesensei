@@ -25,7 +25,7 @@
       },
       {
         "command": "interviewLele.stopInterview",
-        "title": "Codebase Tutor: Stop Ask Me Anything"
+        "title": "Codebase Tutor: Stop Active Operation"
       },
       {
         "command": "interviewLele.showLogs",
@@ -42,6 +42,10 @@
       {
         "command": "interviewLele.testSpeaker",
         "title": "Codebase Tutor: Test Speaker (TTS)"
+      },
+      {
+        "command": "codebaseTutor.generateGuide",
+        "title": "Codebase Tutor: Generate Codebase Guide"
       }
     ],
     "viewsContainers": {
@@ -300,6 +304,12 @@
             "staff"
           ],
           "default": "adaptive"
+        },
+        "interviewLele.tutor.explanationMode": {
+          "type": "string",
+          "enum": ["quick", "guided", "deep"],
+          "default": "guided",
+          "description": "Default Code Tutor guide depth: Quick Overview, Guided Walkthrough, or Deep Dive."
         }
       }
     }
@@ -309,6 +319,7 @@
     "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:naudiodon2 --format=cjs --platform=node --target=node18 --sourcemap && node scripts/copy-native.mjs",
     "watch": "npm run build -- --watch",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/check-webview.mjs && node --test scripts/source-policy.test.mjs",
     "package": "vsce package --no-yarn --no-dependencies --allow-missing-repository"
   },
   "devDependencies": {
