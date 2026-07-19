@@ -13,8 +13,8 @@ import {
 } from './agentConfig';
 import { logger } from '../logger';
 
-const CONFIG_KEY = 'interviewLele.acp.agentConfigs';
-const MEMENTO_KEY = 'interviewLele.agentConfigs';
+const CONFIG_KEY = 'codeSensei.acp.agentConfigs';
+const MEMENTO_KEY = 'codeSensei.agentConfigs';
 
 /**
  * VSCode's configuration writer can reject writes when the setting schema is
@@ -28,7 +28,7 @@ export function initAgentConfigStorage(m: vscode.Memento): void {
 }
 
 export async function loadAgentConfigs(): Promise<AgentConfigMap> {
-  const cfg = vscode.workspace.getConfiguration('interviewLele');
+  const cfg = vscode.workspace.getConfiguration('codeSensei');
   const fromSettings = (cfg.get<AgentConfigMap>(CONFIG_KEY) ?? {}) || {};
   const fromMemento = memento ? (memento.get<AgentConfigMap>(MEMENTO_KEY) ?? {}) : {};
   // Merge: memento takes precedence (it's the reliable fallback)
@@ -43,7 +43,7 @@ export async function saveAgentConfig(agentId: string, config: AgentConfig): Pro
   let savedToSettings = false;
   try {
     await vscode.workspace
-      .getConfiguration('interviewLele')
+      .getConfiguration('codeSensei')
       .update(CONFIG_KEY, all, vscode.ConfigurationTarget.Global);
     savedToSettings = true;
     logger.log(`Saved agent config for ${agentId} to settings.`);
@@ -136,14 +136,14 @@ export async function configureAgentMenu(
 
   const picked = await vscode.window.showQuickPick(actions, {
     placeHolder: `${agent.name} — configure`,
-    title: 'Codebase Tutor: ACP Agent Configuration',
+    title: 'CodeSensei: ACP Agent Configuration',
   });
   if (!picked) return;
 
   switch (picked.action) {
     case 'select':
       onSelect(agent);
-      vscode.window.showInformationMessage(`Codebase Tutor: selected agent "${agent.name}".`);
+      vscode.window.showInformationMessage(`CodeSensei: selected agent "${agent.name}".`);
       return;
 
     case 'model': {
@@ -164,7 +164,7 @@ export async function configureAgentMenu(
       } else {
         const pick = await vscode.window.showQuickPick(items, {
           placeHolder: 'Choose model',
-          title: 'Codebase Tutor: Agent Model',
+          title: 'CodeSensei: Agent Model',
         });
         chosen = pick?.model;
       }
@@ -183,7 +183,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose reasoning effort',
-        title: 'Codebase Tutor: Reasoning Effort',
+        title: 'CodeSensei: Reasoning Effort',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, reasoningEffort: pick.value as ReasoningEffort });
@@ -206,7 +206,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose scope / permission level',
-        title: 'Codebase Tutor: Agent Scope',
+        title: 'CodeSensei: Agent Scope',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, agentMode: pick.value as AgentMode });
@@ -229,7 +229,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose sandbox mode',
-        title: 'Codebase Tutor: Sandbox Mode',
+        title: 'CodeSensei: Sandbox Mode',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, sandboxMode: pick.value as SandboxMode });
@@ -252,7 +252,7 @@ export async function configureAgentMenu(
     }
 
     case 'capabilities': {
-      const out = vscode.window.createOutputChannel('Codebase Tutor: Agent Capabilities');
+      const out = vscode.window.createOutputChannel('CodeSensei: Agent Capabilities');
       out.show();
       out.appendLine(`Agent: ${agent.name} (${agent.id})`);
       out.appendLine(`Available: ${agent.available}`);
@@ -282,7 +282,7 @@ export async function configureAgentMenu(
       const r = agent.resolved;
       const cmd = `${r.cmd} ${r.args.join(' ')}`;
       const env = buildEnvPreview(config);
-      const out = vscode.window.createOutputChannel('Codebase Tutor: Agent Command');
+      const out = vscode.window.createOutputChannel('CodeSensei: Agent Command');
       out.show();
       out.appendLine(`Agent: ${agent.name} (${agent.id})`);
       out.appendLine(`Distribution: ${r.distributionType}`);

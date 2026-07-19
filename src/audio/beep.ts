@@ -1,4 +1,3 @@
-import { spawn } from 'child_process';
 import { logger } from '../logger';
 
 /**
@@ -41,22 +40,13 @@ function generateBeepWav(freqHz = 880, durationMs = 150, sampleRate = 44100): Bu
 }
 
 /**
- * Play a short beep via ffplay. Non-blocking — fires and forgets.
- * @param ffmpegPath Path to ffmpeg/ffplay binary
+ * Play a short beep via the webview AudioContext. Non-blocking — fires and forgets.
+ * @param sink An object with a playBeepWav(base64) method (e.g. HomeViewProvider)
  */
-export function playBeep(ffmpegPath = 'ffmpeg'): void {
+export function playBeep(sink: { playBeepWav(base64: string): void }): void {
   try {
-    const ffplay = ffmpegPath.replace(/ffmpeg(\.exe)?$/i, 'ffplay$1');
     const wav = generateBeepWav(880, 150);
-    const p = spawn(ffplay, ['-nodisp', '-autoexit', '-nostats', '-loglevel', 'quiet', '-i', 'pipe:0'], {
-      stdio: ['pipe', 'ignore', 'ignore'],
-      windowsHide: true,
-    });
-    p.on('error', () => { /* ignore — ffplay might not be available */ });
-    try {
-      p.stdin?.write(wav);
-      p.stdin?.end();
-    } catch { /* ignore */ }
+    sink.playBeepWav(wav.toString('base64'));
   } catch (e) {
     logger.error(`[beep] Failed: ${(e as Error).message}`);
   }
@@ -64,24 +54,15 @@ export function playBeep(ffmpegPath = 'ffmpeg'): void {
 
 /**
  * Play a double beep (high-low) to signal "listening" state.
+ * @param sink An object with a playBeepWav(base64) method (e.g. HomeViewProvider)
  */
-export function playListeningBeep(ffmpegPath = 'ffmpeg'): void {
+export function playListeningBeep(sink: { playBeepWav(base64: string): void }): void {
   try {
-    const ffplay = ffmpegPath.replace(/ffmpeg(\.exe)?$/i, 'ffplay$1');
     // High beep (880Hz) then low beep (660Hz) — like "go ahead"
     const wav1 = generateBeepWav(880, 100);
     const wav2 = generateBeepWav(660, 100);
     const combined = Buffer.concat([wav1, generateBeepWav(440, 50), wav2]); // gap tone at low volume
-
-    const p = spawn(ffplay, ['-nodisp', '-autoexit', '-nostats', '-loglevel', 'quiet', '-i', 'pipe:0'], {
-      stdio: ['pipe', 'ignore', 'ignore'],
-      windowsHide: true,
-    });
-    p.on('error', () => {});
-    try {
-      p.stdin?.write(combined);
-      p.stdin?.end();
-    } catch { /* ignore */ }
+    sink.playBeepWav(combined.toString('base64'));
   } catch (e) {
     logger.error(`[beep] Failed: ${(e as Error).message}`);
   }
