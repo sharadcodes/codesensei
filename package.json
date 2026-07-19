@@ -1,10 +1,18 @@
 {
-  "name": "codebase-tutor",
-  "displayName": "Codebase Tutor",
-  "description": "Learn a codebase with AI, then use Ask Me Anything to test your understanding through a live, code-aware conversation.",
+  "name": "codesensei",
+  "displayName": "CodeSensei",
+  "description": "Learn any codebase with AI, then test your understanding through a live, voice-driven Knowledge Check session.",
   "version": "0.1.0",
-  "publisher": "codebase-tutor",
+  "publisher": "sharadcodes",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sharadcodes/codesensei.git"
+  },
+  "homepage": "https://github.com/sharadcodes/codesensei#readme",
+  "bugs": {
+    "url": "https://github.com/sharadcodes/codesensei/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -13,6 +21,31 @@
     "Machine Learning",
     "Education"
   ],
+  "keywords": [
+    "ai",
+    "codebase",
+    "learning",
+    "voice",
+    "interview",
+    "knowledge-check",
+    "acp",
+    "tutor",
+    "onboarding",
+    "stt",
+    "tts"
+  ],
+  "icon": "logo.png",
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/badge/built%20with-%E2%9D%A4-red",
+      "href": "https://github.com/sharadcodes/codesensei",
+      "description": "Built with love"
+    }
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -20,51 +53,51 @@
   "contributes": {
     "commands": [
       {
-        "command": "interviewLele.startInterview",
-        "title": "Codebase Tutor: Start Ask Me Anything"
+        "command": "codeSensei.startInterview",
+        "title": "CodeSensei: Start Knowledge Check"
       },
       {
-        "command": "interviewLele.stopInterview",
-        "title": "Codebase Tutor: Stop Active Operation"
+        "command": "codeSensei.stopInterview",
+        "title": "CodeSensei: Stop Active Operation"
       },
       {
-        "command": "interviewLele.showLogs",
-        "title": "Codebase Tutor: Show Logs"
+        "command": "codeSensei.showLogs",
+        "title": "CodeSensei: Show Logs"
       },
       {
-        "command": "interviewLele.refreshAgents",
-        "title": "Codebase Tutor: Refresh ACP Agents"
+        "command": "codeSensei.refreshAgents",
+        "title": "CodeSensei: Refresh ACP Agents"
       },
       {
-        "command": "interviewLele.testMic",
-        "title": "Codebase Tutor: Test Microphone"
+        "command": "codeSensei.testMic",
+        "title": "CodeSensei: Test Microphone"
       },
       {
-        "command": "interviewLele.testSpeaker",
-        "title": "Codebase Tutor: Test Speaker (TTS)"
+        "command": "codeSensei.testSpeaker",
+        "title": "CodeSensei: Test Speaker (TTS)"
       },
       {
-        "command": "interviewLele.clearSession",
-        "title": "Codebase Tutor: Clear Cached Session"
+        "command": "codeSensei.clearSession",
+        "title": "CodeSensei: Clear Cached Session"
       },
       {
-        "command": "codebaseTutor.generateGuide",
-        "title": "Codebase Tutor: Generate Codebase Guide"
+        "command": "codeSensei.generateGuide",
+        "title": "CodeSensei: Generate Codebase Guide"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "interviewLele",
-          "title": "Codebase Tutor",
-          "icon": "media/icon.svg"
+          "id": "codeSensei",
+          "title": "CodeSensei",
+          "icon": "media/codesensei-logo.svg"
         }
       ]
     },
     "views": {
-      "interviewLele": [
+      "codeSensei": [
         {
-          "id": "interviewLele.home",
+          "id": "codeSensei.home",
           "name": "Home",
           "type": "webview"
         }
@@ -72,113 +105,118 @@
     },
     "menus": {},
     "configuration": {
-      "title": "Codebase Tutor",
+      "title": "CodeSensei",
       "properties": {
-
-        "interviewLele.stt.baseUrl": {
+        "codeSensei.stt.baseUrl": {
           "type": "string",
           "default": "https://openrouter.ai/api/v1",
           "description": "Base URL for speech-to-text (OpenAI-compatible /audio/transcriptions)."
         },
-        "interviewLele.stt.model": {
+        "codeSensei.stt.model": {
           "type": "string",
           "default": "mistralai/voxtral-mini-transcribe",
           "description": "STT model slug. Voxtral Mini Transcribe via OpenRouter by default."
         },
-        "interviewLele.stt.apiKey": {
+        "codeSensei.stt.apiKey": {
           "type": "string",
           "default": "",
           "description": "API key for STT endpoint. Falls back to OPENROUTER_API_KEY then OPENAI_API_KEY."
         },
-        "interviewLele.stt.path": {
+        "codeSensei.stt.path": {
           "type": "string",
           "default": "/audio/transcriptions"
         },
-        "interviewLele.stt.language": {
+        "codeSensei.stt.language": {
           "type": "string",
           "default": "en",
           "description": "ISO-639-1 language code. Empty = auto-detect."
         },
-        "interviewLele.tts.baseUrl": {
+        "codeSensei.tts.baseUrl": {
           "type": "string",
           "default": "http://localhost:8881/v1",
           "description": "Base URL for text-to-speech (OpenAI-compatible /audio/speech). Kokoro FastAPI by default."
         },
-        "interviewLele.tts.model": {
+        "codeSensei.tts.model": {
           "type": "string",
           "default": "tts-1"
         },
-        "interviewLele.tts.apiKey": {
+        "codeSensei.tts.apiKey": {
           "type": "string",
           "default": "not-needed",
           "description": "API key for TTS endpoint. Kokoro doesn't require one."
         },
-        "interviewLele.tts.voice": {
+        "codeSensei.tts.voice": {
           "type": "string",
           "default": "af_heart",
           "description": "Voice name. Kokoro voices: af_heart, af_bella, af_nova, etc."
         },
-        "interviewLele.tts.path": {
+        "codeSensei.tts.path": {
           "type": "string",
           "default": "/audio/speech"
         },
-        "interviewLele.tts.responseFormat": {
+        "codeSensei.tts.responseFormat": {
           "type": "string",
-          "enum": ["wav", "flac", "ogg", "mp3", "opus"],
+          "enum": [
+            "wav",
+            "flac",
+            "ogg",
+            "mp3",
+            "opus"
+          ],
           "default": "wav",
           "description": "Audio format returned by the TTS endpoint. Kokoro supports wav/flac/ogg; OpenAI TTS supports mp3/opus/aac/flac."
         },
-        "interviewLele.chat.baseUrl": {
+        "codeSensei.chat.baseUrl": {
           "type": "string",
           "default": "https://openrouter.ai/api/v1",
           "description": "Base URL for chat completions (chained mode)."
         },
-        "interviewLele.chat.model": {
+        "codeSensei.chat.model": {
           "type": "string",
           "default": "openai/gpt-5.6",
-          "description": "Chat model for Ask Me Anything orchestration in chained mode."
+          "description": "Chat model for Knowledge Check orchestration in chained mode."
         },
-        "interviewLele.chat.apiKey": {
+        "codeSensei.chat.apiKey": {
           "type": "string",
           "default": "",
           "description": "API key for chat endpoint. Falls back to OPENROUTER_API_KEY then OPENAI_API_KEY."
         },
-        "interviewLele.chat.path": {
+        "codeSensei.chat.path": {
           "type": "string",
           "default": "/chat/completions"
         },
-        "interviewLele.audio.inputDeviceId": {
+        "codeSensei.audio.inputDeviceId": {
           "type": "number",
           "default": -1,
           "description": "PortAudio input device ID for mic capture. -1 = default device. Use the dropdown in the settings panel to pick."
         },
-        "interviewLele.audio.silenceSeconds": {
+        "codeSensei.audio.silenceSeconds": {
           "type": "number",
           "default": 2,
           "description": "Seconds of silence before ending a speech segment. Higher = more patient (good for thoughtful answers), lower = snappier."
         },
-        "interviewLele.audio.beepEnabled": {
+        "codeSensei.audio.beepEnabled": {
           "type": "boolean",
           "default": true,
           "description": "Play a beep sound when it's your turn to speak."
         },
-        "interviewLele.acp.selectedAgentId": {
+        "codeSensei.acp.selectedAgentId": {
           "type": "string",
           "default": "",
           "description": "Id of the ACP agent used to gather codebase context. Built-in ids: codex, devin."
         },
-        "interviewLele.acp.agentConfigs": {
+        "codeSensei.acp.agentConfigs": {
           "type": "object",
           "default": {},
           "description": "Per-agent configuration map (agentId -> { model, reasoningEffort, agentMode, sandboxMode, modelProvider, extraEnv, extraSessionConfig }). Set via the Configure ACP Agent command.",
           "scope": "application"
         },
-        "interviewLele.acp.contextPrompt": {
+        "codeSensei.acp.contextPrompt": {
           "type": "string",
           "default": "You are analyzing this codebase so its user can learn it and test their understanding. Produce a concise structured summary covering: (1) the project's purpose and tech stack, (2) the most important files and why they matter, (3) the trickiest or most interesting code areas worth understanding, and (4) 5-10 knowledge-check topics each tied to a specific file path and a short rationale. Return the result as JSON with keys: summary, files (array of {path, role}), topics (array of {title, filePath, lineStart, lineEnd, rationale}).",
           "description": "Prompt sent to the ACP agent to extract codebase learning and knowledge-check context."
         },
-        "interviewLele.acp.customAgents": {
+        "codeSensei.acp.customAgents": {
           "type": "array",
           "default": [],
           "description": "Additional ACP-over-stdio agents. Validated with an ACP initialize handshake when used.",
@@ -209,12 +247,12 @@
             }
           }
         },
-        "interviewLele.interview.maxQuestions": {
+        "codeSensei.interview.maxQuestions": {
           "type": "number",
           "default": 0,
           "description": "Maximum number of questions to ask. 0 = unlimited until the user stops."
         },
-        "interviewLele.interview.difficulty": {
+        "codeSensei.interview.difficulty": {
           "type": "string",
           "enum": [
             "adaptive",
@@ -225,9 +263,13 @@
           ],
           "default": "adaptive"
         },
-        "interviewLele.tutor.explanationMode": {
+        "codeSensei.tutor.explanationMode": {
           "type": "string",
-          "enum": ["quick", "guided", "deep"],
+          "enum": [
+            "quick",
+            "guided",
+            "deep"
+          ],
           "default": "guided",
           "description": "Default Code Tutor guide depth: Quick Overview, Guided Walkthrough, or Deep Dive."
         }
@@ -240,10 +282,10 @@
     "watch": "npm run build -- --watch",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/check-webview.mjs && node --test scripts/source-policy.test.mjs",
-    "package": "vsce package --no-yarn --no-dependencies --allow-missing-repository"
+    "package": "vsce package --no-yarn --no-dependencies"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^20.19.43",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.23.0",
