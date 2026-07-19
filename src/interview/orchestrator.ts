@@ -58,7 +58,7 @@ const OPEN_FILE_TOOL: RealtimeTool = {
   type: 'function',
   name: 'open_file',
   description:
-    'Open a source file in the editor and highlight a specific line range so the candidate can see the code you are about to ask about. Call this BEFORE you ask the question, every time you want to focus on a concrete piece of code.',
+    'Open a source file in the editor and highlight a specific line range so the user can see the code you are about to ask about. Call this BEFORE you ask the question whenever you focus on a concrete piece of code.',
   parameters: {
     type: 'object',
     properties: {
@@ -74,7 +74,7 @@ const END_INTERVIEW_TOOL: RealtimeTool = {
   type: 'function',
   name: 'end_interview',
   description:
-    'Call this when you have covered enough ground and want to wrap up the interview with a brief summary and goodbye.',
+    'Call this when you have tested enough of the user\'s understanding and want to wrap up Ask Me Anything with a brief assessment and goodbye.',
   parameters: { type: 'object', properties: {} },
 };
 
@@ -173,7 +173,7 @@ export class InterviewOrchestrator {
 
     const instructions = `${config.realtime.instructions}
 
-You are interviewing the candidate about THIS codebase:
+You are testing the user's understanding of THIS codebase in Ask Me Anything:
 
 PROJECT SUMMARY:
 ${context.summary}
@@ -181,7 +181,7 @@ ${context.summary}
 KEY FILES:
 ${filesBrief}
 
-SUGGESTED INTERVIEW TOPICS (use open_file before asking about each):
+SUGGESTED KNOWLEDGE-CHECK TOPICS (use open_file before asking about each):
 ${topicsBrief}
 ${opts.priorTranscript && opts.priorTranscript.length > 0 ? `
 PREVIOUS INTERVIEW HISTORY (you are resuming a prior session):
@@ -189,7 +189,7 @@ ${opts.priorTranscript.map((t) => `${t.role === 'interviewer' ? 'Interviewer' : 
 
 Continue the interview from where you left off. Do NOT repeat questions already asked.` : ''}
 
-INTERVIEWER PERSONA — behave like a real human interviewer:
+KNOWLEDGE EVALUATOR — behave like a curious, supportive technical peer:
 - Speak naturally and concisely, as if on a phone/video call. No bullet points, no lectures, no markdown.
 - One question at a time. Listen actively. React like a human: "Good point", "Hmm, not quite", "Can you elaborate?"
 - NEVER teach or explain the correct answer. Your job is to assess, not tutor. If they get it wrong, note it and move on.
@@ -331,11 +331,11 @@ RULES:
     this.mic.start();
 
     this.setState('listening', onEvent);
-    onEvent({ kind: 'log', text: 'Interview live (realtime mode). Speak naturally — say "stop" or use the Stop command to end.' });
+    onEvent({ kind: 'log', text: 'Ask Me Anything is live (realtime mode). Speak naturally — say "stop" or use the Stop command to end.' });
 
     const openingText = opts.priorTranscript && opts.priorTranscript.length > 0
-      ? `Resume the interview now. Greet the candidate briefly, acknowledge you're continuing, then ask the next question. Do NOT repeat previous questions.`
-      : `Begin the interview now. Greet the candidate briefly, then call open_file for the first topic and ask your first question.`;
+      ? `Resume Ask Me Anything now. Greet the user briefly, acknowledge you're continuing, then ask the next question. Do NOT repeat previous questions.`
+      : `Begin Ask Me Anything now. Greet the user briefly, then call open_file for the first topic and ask your first knowledge-check question.`;
 
     provider.sendText(openingText);
 
@@ -380,13 +380,13 @@ RULES:
       return;
     }
 
-    // PortAudio mic capture with VAD — always use system default device
+    // PortAudio mic capture with VAD — use the configured device or system default.
     const silenceMs = Math.round(config.audio.silenceSeconds * 1000);
 
     this.paMic = new PortAudioMicCapture({
       sampleRate: 16000,
       channels: 1,
-      deviceId: -1, // -1 = system default
+      deviceId: config.audio.inputDeviceId,
       silenceMs,
       minSpeechMs: 200,
       maxSpeechMs: 60000,
@@ -415,7 +415,7 @@ RULES:
     });
 
     this.setState('listening', onEvent);
-    onEvent({ kind: 'log', text: `Interview live (chained: PortAudio mic → Voxtral STT → OpenAI-compatible chat → Kokoro TTS). Speak naturally.` });
+    onEvent({ kind: 'log', text: `Ask Me Anything is live (chained: PortAudio mic → Voxtral STT → OpenAI-compatible chat → Kokoro TTS). Speak naturally.` });
 
     // Start mic
     this.paMic.start();

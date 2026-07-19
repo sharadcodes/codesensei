@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 /**
  * Persistent output channel that shows up in VSCode's Output panel dropdown
- * as "Interview Lele". All extension logs (ACP agent stderr, Realtime events,
+ * as "Codebase Tutor". All extension logs (ACP agent stderr, Realtime events,
  * audio capture, orchestrator state) route through here so users can watch
  * the full pipeline live.
  */
@@ -11,7 +11,7 @@ class Logger {
 
   init(): void {
     if (!this.channel) {
-      this.channel = vscode.window.createOutputChannel('Interview Lele');
+      this.channel = vscode.window.createOutputChannel('Codebase Tutor');
     }
   }
 

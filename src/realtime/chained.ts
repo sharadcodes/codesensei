@@ -124,7 +124,7 @@ export class ChainedVoiceProvider extends EventEmitter {
 
   /** Internal: generate the interviewer response without pushing candidate text to history. */
   private async generateTurn(candidateText: string): Promise<{ text: string; openFile?: { filePath: string; lineStart: number; lineEnd: number }; endInterview?: boolean }> {
-    const systemPrompt = `You are a senior engineering interviewer conducting a live, voice-based technical interview about THIS codebase:
+    const systemPrompt = `You are a friendly, rigorous codebase knowledge evaluator running a live, voice-based Ask Me Anything session about THIS codebase:
 
 PROJECT SUMMARY:
 ${this.contextSummary}
@@ -132,10 +132,10 @@ ${this.contextSummary}
 KEY FILES:
 ${this.filesBrief}
 
-SUGGESTED INTERVIEW TOPICS:
+SUGGESTED KNOWLEDGE-CHECK TOPICS:
 ${this.topicsBrief}
 
-INTERVIEWER PERSONA — behave like a real human interviewer:
+KNOWLEDGE EVALUATOR — behave like a curious, supportive technical peer:
 - Speak naturally and concisely, as if on a phone/video call. No bullet points, no lectures, no markdown.
 - Begin with a brief warm greeting, then dive in. One question at a time.
 - Listen actively. React to the candidate's answer like a human: "Good point", "Hmm, not quite", "Interesting — can you elaborate?"
@@ -148,7 +148,7 @@ SCORING — after every candidate answer, internally rate it:
 - Strong: correct, clear, shows depth
 - Adequate: mostly right, some gaps
 - Weak: incorrect, vague, or "I don't know"
-Keep a running mental tally. At the end of the interview, give a final summary with per-topic scores (1-5) and overall recommendation.
+Keep a running mental tally. At the end, give a final summary with per-topic understanding scores (1-5), strengths, and areas to revisit.
 
 RULES:
 - Ask ONE question at a time. Wait for the answer. Do not stack questions.
@@ -207,7 +207,7 @@ RULES:
     // Build the prompt with system instructions + candidate's answer
     const prompt = [
       { type: 'text', text: systemPrompt },
-      { type: 'text', text: `The candidate just said: "${candidateText}"\n\nRespond as the interviewer. Remember: short, natural, one question at a time. Use <open_file>...</open_file> to focus on code, <end_interview/> to end.` },
+      { type: 'text', text: `The user just said: "${candidateText}"\n\nRespond as the knowledge evaluator. Remember: short, natural, one question at a time. Use <open_file>...</open_file> to focus on code, <end_interview/> to end.` },
     ];
 
     let collected = '';
@@ -272,7 +272,7 @@ RULES:
 
   /** Generate the opening greeting + first question. Does NOT push a fake candidate message to history. */
   async opening(): Promise<{ text: string; openFile?: { filePath: string; lineStart: number; lineEnd: number } }> {
-    return this.generateTurn('Begin the interview now. Greet the candidate briefly, then open the first file and ask your first question.');
+    return this.generateTurn('Begin Ask Me Anything now. Greet the user briefly, then open the first file and ask your first knowledge-check question.');
   }
 
   /** Clean up ACP session if active. */

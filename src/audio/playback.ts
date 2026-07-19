@@ -108,7 +108,7 @@ export class AudioPlayback extends EventEmitter {
     const pcm = Buffer.concat(this.buffer);
     this.buffer = [];
     const wav = pcmToWav(pcm, this.opts.sampleRate, this.opts.channels ?? 1);
-    const tmp = path.join(os.tmpdir(), `interview-lele-${Date.now()}.wav`);
+    const tmp = path.join(os.tmpdir(), `codebase-tutor-${Date.now()}.wav`);
     await fs.writeFile(tmp, wav);
     try {
       await playFile(tmp);
