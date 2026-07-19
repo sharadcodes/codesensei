@@ -22,7 +22,7 @@ let activeOperation: { kind: 'interview' | 'guide'; source: vscode.CancellationT
 
 export function activate(context: vscode.ExtensionContext): void {
   logger.init();
-  logger.log('Codebase Tutor extension activating.');
+  logger.log('CodeSensei extension activating.');
   initAgentConfigStorage(context.globalState);
 
   homeView = new HomeViewProvider(context.extensionUri);
@@ -33,14 +33,14 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('interviewLele.refreshAgents', () => homeView?.refresh()),
-    vscode.commands.registerCommand('interviewLele.showLogs', () => showLogs(true)),
-    vscode.commands.registerCommand('interviewLele.startInterview', () => runInterview(context)),
-    vscode.commands.registerCommand('interviewLele.stopInterview', () => stopActiveOperation()),
-    vscode.commands.registerCommand('interviewLele.testMic', () => testMic()),
-    vscode.commands.registerCommand('interviewLele.testSpeaker', () => testSpeaker()),
-    vscode.commands.registerCommand('interviewLele.clearSession', () => clearCachedSession(context)),
-    vscode.commands.registerCommand('codebaseTutor.generateGuide', () => createTutorGuide())
+    vscode.commands.registerCommand('codeSensei.refreshAgents', () => homeView?.refresh()),
+    vscode.commands.registerCommand('codeSensei.showLogs', () => showLogs(true)),
+    vscode.commands.registerCommand('codeSensei.startInterview', () => runInterview(context)),
+    vscode.commands.registerCommand('codeSensei.stopInterview', () => stopActiveOperation()),
+    vscode.commands.registerCommand('codeSensei.testMic', () => testMic()),
+    vscode.commands.registerCommand('codeSensei.testSpeaker', () => testSpeaker()),
+    vscode.commands.registerCommand('codeSensei.clearSession', () => clearCachedSession(context)),
+    vscode.commands.registerCommand('codeSensei.generateGuide', () => createTutorGuide())
   );
 }
 
@@ -52,13 +52,13 @@ export function deactivate(): void {
 }
 
 async function runInterview(context: vscode.ExtensionContext): Promise<void> {
-  const operation = beginOperation('interview', 'Preparing Ask Me Anything…');
+  const operation = beginOperation('interview', 'Preparing Knowledge Check…');
   if (!operation) return;
   try {
     await startInterview(context, operation.source.token);
   } catch (error) {
     if (!(error instanceof vscode.CancellationError)) throw error;
-    homeView?.postStatus('Ask Me Anything cancelled.');
+    homeView?.postStatus('Knowledge Check cancelled.');
     homeView?.setInterviewState('ended');
   } finally {
     finishOperation(operation);
@@ -67,7 +67,7 @@ async function runInterview(context: vscode.ExtensionContext): Promise<void> {
 
 async function startInterview(context: vscode.ExtensionContext, operationToken: vscode.CancellationToken): Promise<void> {
   if (orchestrator && orchestrator.currentState !== 'idle' && orchestrator.currentState !== 'ended') {
-    vscode.window.showWarningMessage('Ask Me Anything is already in progress.');
+    vscode.window.showWarningMessage('Knowledge Check is already in progress.');
     homeView?.show();
     return;
   }
@@ -182,7 +182,7 @@ async function startInterview(context: vscode.ExtensionContext, operationToken: 
         codebaseContext = await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: `Codebase Tutor: ${agent.name} is analyzing the codebase`,
+            title: `CodeSensei: ${agent.name} is analyzing the codebase`,
             cancellable: true,
           },
           async (progress, token) => {
@@ -269,7 +269,7 @@ async function stopActiveOperation(): Promise<void> {
   const operation = activeOperation;
   if (!operation || operation.stopping) return;
   operation.stopping = true;
-  homeView?.setOperation(operation.kind, 'cancelling', operation.kind === 'guide' ? 'Stopping guide generation…' : 'Stopping Ask Me Anything…');
+  homeView?.setOperation(operation.kind, 'cancelling', operation.kind === 'guide' ? 'Stopping guide generation…' : 'Stopping Knowledge Check…');
   // Cancel the token first so any in-flight analysis/ACP calls bail out
   operation.source.cancel();
   if (operation.kind === 'interview' && orchestrator) {
@@ -306,15 +306,15 @@ async function createTutorGuide(): Promise<void> {
     { label: 'Deep Dive + build/config', description: '15+ minutes · include approved build and infrastructure files', mode: 'deep' as ExplanationMode, buildAccess: 'include-build-config' as BuildAccess },
   ];
   guideChoices.sort((a, b) => Number(b.mode === preferredMode && b.buildAccess === 'source-only') - Number(a.mode === preferredMode && a.buildAccess === 'source-only'));
-  const picked = await vscode.window.showQuickPick(guideChoices, { title: 'Codebase Tutor: Guide options', placeHolder: 'Choose explanation depth and repository access' });
+  const picked = await vscode.window.showQuickPick(guideChoices, { title: 'CodeSensei: Guide options', placeHolder: 'Choose explanation depth and repository access' });
   if (!picked) return;
-  await vscode.workspace.getConfiguration('interviewLele').update('tutor.explanationMode', picked.mode, vscode.ConfigurationTarget.Global);
+  await vscode.workspace.getConfiguration('codeSensei').update('tutor.explanationMode', picked.mode, vscode.ConfigurationTarget.Global);
 
-  const outputUri = vscode.Uri.joinPath(workspaceRoot, 'CODEBASE_TUTOR.md');
+  const outputUri = vscode.Uri.joinPath(workspaceRoot, 'CODESENSEI.md');
   try {
     await vscode.workspace.fs.stat(outputUri);
     const choice = await vscode.window.showWarningMessage(
-      'CODEBASE_TUTOR.md already exists. Replace it with a newly generated guide?',
+      'CODESENSEI.md already exists. Replace it with a newly generated guide?',
       { modal: true },
       'Replace guide'
     );
@@ -331,7 +331,7 @@ async function createTutorGuide(): Promise<void> {
     const guide = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Codebase Tutor: ${agent.name} is creating your guide`,
+        title: `CodeSensei: ${agent.name} is creating your guide`,
         cancellable: true,
       },
       async (progress, token) => {
@@ -349,12 +349,12 @@ async function createTutorGuide(): Promise<void> {
       }
     );
     if (operation.source.token.isCancellationRequested) throw new vscode.CancellationError();
-    homeView?.setOperation('guide', 'writing', 'Writing CODEBASE_TUTOR.md…');
+    homeView?.setOperation('guide', 'writing', 'Writing CODESENSEI.md…');
     await vscode.workspace.fs.writeFile(outputUri, Buffer.from(guide, 'utf8'));
     const document = await vscode.workspace.openTextDocument(outputUri);
     await vscode.window.showTextDocument(document, { preview: false });
-    homeView?.postStatus('Code Tutor guide is ready: CODEBASE_TUTOR.md');
-    vscode.window.showInformationMessage('Codebase Tutor created CODEBASE_TUTOR.md.');
+    homeView?.postStatus('Code Tutor guide is ready: CODESENSEI.md');
+    vscode.window.showInformationMessage('CodeSensei created CODESENSEI.md.');
   } catch (error) {
     if (error instanceof vscode.CancellationError || operation.source.token.isCancellationRequested) {
       homeView?.postStatus('Guide generation cancelled.');
@@ -371,7 +371,7 @@ async function createTutorGuide(): Promise<void> {
 
 function beginOperation(kind: 'interview' | 'guide', status: string): typeof activeOperation {
   if (activeOperation) {
-    void vscode.window.showWarningMessage(`${activeOperation.kind === 'guide' ? 'Guide generation' : 'Ask Me Anything'} is already in progress.`);
+    void vscode.window.showWarningMessage(`${activeOperation.kind === 'guide' ? 'Guide generation' : 'Knowledge Check'} is already in progress.`);
     homeView?.show();
     return null;
   }
@@ -389,7 +389,7 @@ function finishOperation(operation: NonNullable<typeof activeOperation>): void {
 
 function showLogs(notify: boolean): void {
   logger.show();
-  if (notify) void vscode.window.showInformationMessage('Check the Codebase Tutor channel in the Output panel for detailed logs.');
+  if (notify) void vscode.window.showInformationMessage('Check the CodeSensei channel in the Output panel for detailed logs.');
 }
 
 async function clearCachedSession(context: vscode.ExtensionContext): Promise<void> {
@@ -399,7 +399,7 @@ async function clearCachedSession(context: vscode.ExtensionContext): Promise<voi
     return;
   }
   await clearSession(context, workspaceRoot);
-  vscode.window.showInformationMessage('Codebase Tutor: Cached session cleared. Next Ask Me Anything will re-analyze from scratch.');
+  vscode.window.showInformationMessage('CodeSensei: Cached session cleared. Next Knowledge Check will re-analyze from scratch.');
   logger.log('Cached session cleared by user.');
 }
 
@@ -452,7 +452,7 @@ async function fallbackContext(workspaceRoot: string): Promise<CodebaseContext> 
 
   await walk(workspaceRoot, 0);
   return {
-    summary: `Workspace at ${workspaceRoot}. No ACP agent was used; Ask Me Anything will work from a shallow file scan of ${files.length} source files.`,
+    summary: `Workspace at ${workspaceRoot}. No ACP agent was used; Knowledge Check will work from a shallow file scan of ${files.length} source files.`,
     files,
     topics,
   };

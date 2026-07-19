@@ -61,7 +61,7 @@ export interface FullConfig {
 }
 
 function resolveApiKey(settingKey: string, ...envFallbacks: string[]): string {
-  const cfg = vscode.workspace.getConfiguration('interviewLele');
+  const cfg = vscode.workspace.getConfiguration('codeSensei');
   const fromSetting = cfg.get<string>(settingKey);
   if (fromSetting) return fromSetting;
   for (const env of envFallbacks) {
@@ -71,7 +71,7 @@ function resolveApiKey(settingKey: string, ...envFallbacks: string[]): string {
 }
 
 export function loadConfig(): FullConfig {
-  const cfg = vscode.workspace.getConfiguration('interviewLele');
+  const cfg = vscode.workspace.getConfiguration('codeSensei');
   return {
     // STT defaults to OpenRouter with Voxtral Mini Transcribe
     stt: {
