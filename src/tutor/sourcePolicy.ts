@@ -33,7 +33,7 @@ const SOURCE_ROOTS = new Set(['src', 'app', 'pages', 'components', 'lib', 'test'
 const BUILD_ROOTS = new Set(['.github', 'infra', 'infrastructure', 'deploy', 'deployment', 'helm']);
 
 export async function createAnalysisWorkspace(root: string, buildAccess: BuildAccess): Promise<AnalysisWorkspace> {
-  const destination = await fs.mkdtemp(path.join(os.tmpdir(), 'codebase-tutor-analysis-'));
+  const destination = await fs.mkdtemp(path.join(os.tmpdir(), 'codesensei-analysis-'));
   const files: string[] = [];
   let totalBytes = 0;
   const maxFiles = 300;

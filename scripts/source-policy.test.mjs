@@ -11,8 +11,8 @@ let policy;
 let bundled;
 
 before(async () => {
-  fixture = await fs.mkdtemp(path.join(os.tmpdir(), 'codebase-tutor-policy-test-'));
-  bundled = path.join(os.tmpdir(), `codebase-tutor-source-policy-${process.pid}.mjs`);
+  fixture = await fs.mkdtemp(path.join(os.tmpdir(), 'codesensei-policy-test-'));
+  bundled = path.join(os.tmpdir(), `codesensei-source-policy-${process.pid}.mjs`);
   await build({ entryPoints: [path.resolve('src/tutor/sourcePolicy.ts')], bundle: true, platform: 'node', format: 'esm', outfile: bundled });
   policy = await import(pathToFileURL(bundled).href);
 });
