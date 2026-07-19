@@ -1,4 +1,4 @@
-# CodeSensei
+# AI CodeSensei
 
 <div align="center">
 
@@ -12,13 +12,13 @@ Built with ❤ by [sharadcodes](https://github.com/sharadcodes) · [g-savitha](h
 
 ## Overview
 
-CodeSensei helps you understand a codebase, then tests your knowledge through a live, voice-driven **Knowledge Check** session. It uses ACP agents (Codex, Devin, etc.) to analyze your repository, then conducts a real-time conversation where it asks questions about the code, opens the relevant files, and highlights the exact lines it's asking about.
+AI CodeSensei helps you understand a codebase, then tests your knowledge through a live, voice-driven **Knowledge Check** session. It uses ACP agents (Codex, Devin, etc.) to analyze your repository, then conducts a real-time conversation where it asks questions about the code, opens the relevant files, and highlights the exact lines it's asking about.
 
 ## Features
 
 ### Code Tutor Guide
 
-Generates a comprehensive `CODESENSEI.md` guide by reading your repository with your selected ACP agent. Choose from three depths:
+Generates a comprehensive `AI CodeSensei.md` guide by reading your repository with your selected ACP agent. Choose from three depths:
 
 - **Quick Overview** (~5 min) — purpose, stack, entry points, architecture map
 - **Guided Walkthrough** (~10 min) — major modules, data/control flow, conventions
@@ -45,9 +45,9 @@ A live, voice-driven interview about your codebase:
 
 ## Quick Start
 
-1. Install CodeSensei from the VS Code Marketplace
+1. Install AI CodeSensei from the VS Code Marketplace
 2. Open the workspace you want to learn
-3. Click the **CodeSensei** icon in the Activity Bar
+3. Click the **AI CodeSensei** icon in the Activity Bar
 4. Click **↻ Agents** to discover available ACP agents
 5. Select an agent (check icon)
 6. Click **Start session** to begin a Knowledge Check
@@ -55,75 +55,75 @@ A live, voice-driven interview about your codebase:
 
 ## Configuration
 
-All settings live under the `codeSensei.*` namespace. Open Settings (`Ctrl+,`) and search for `codesensei`.
+All settings live under the `AI CodeSensei.*` namespace. Open Settings (`Ctrl+,`) and search for `AI CodeSensei`.
 
 ### Speech-to-Text (STT)
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `codeSensei.stt.baseUrl` | `https://openrouter.ai/api/v1` | OpenAI-compatible STT endpoint |
-| `codeSensei.stt.model` | `mistralai/voxtral-mini-transcribe` | STT model slug |
-| `codeSensei.stt.apiKey` | — | API key. Falls back to `OPENROUTER_API_KEY`, then `OPENAI_API_KEY` |
-| `codeSensei.stt.path` | `/audio/transcriptions` | Endpoint path |
-| `codeSensei.stt.language` | `en` | ISO-639-1 language code. Empty = auto-detect |
+| `AI CodeSensei.stt.baseUrl` | `https://openrouter.ai/api/v1` | OpenAI-compatible STT endpoint |
+| `AI CodeSensei.stt.model` | `mistralai/voxtral-mini-transcribe` | STT model slug |
+| `AI CodeSensei.stt.apiKey` | — | API key. Falls back to `OPENROUTER_API_KEY`, then `OPENAI_API_KEY` |
+| `AI CodeSensei.stt.path` | `/audio/transcriptions` | Endpoint path |
+| `AI CodeSensei.stt.language` | `en` | ISO-639-1 language code. Empty = auto-detect |
 
 ### Text-to-Speech (TTS)
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `codeSensei.tts.baseUrl` | `http://localhost:8881/v1` | OpenAI-compatible TTS endpoint (Kokoro FastAPI by default) |
-| `codeSensei.tts.model` | `tts-1` | TTS model |
-| `codeSensei.tts.apiKey` | `not-needed` | API key (Kokoro doesn't require one) |
-| `codeSensei.tts.voice` | `af_heart` | Voice name (Kokoro: `af_heart`, `af_bella`, `af_nova`, etc.) |
-| `codeSensei.tts.path` | `/audio/speech` | Endpoint path |
-| `codeSensei.tts.responseFormat` | `wav` | Audio format: `wav`, `flac`, `ogg`, `mp3`, `opus` |
+| `AI CodeSensei.tts.baseUrl` | `http://localhost:8881/v1` | OpenAI-compatible TTS endpoint (Kokoro FastAPI by default) |
+| `AI CodeSensei.tts.model` | `tts-1` | TTS model |
+| `AI CodeSensei.tts.apiKey` | `not-needed` | API key (Kokoro doesn't require one) |
+| `AI CodeSensei.tts.voice` | `af_heart` | Voice name (Kokoro: `af_heart`, `af_bella`, `af_nova`, etc.) |
+| `AI CodeSensei.tts.path` | `/audio/speech` | Endpoint path |
+| `AI CodeSensei.tts.responseFormat` | `wav` | Audio format: `wav`, `flac`, `ogg`, `mp3`, `opus` |
 
 ### Chat (LLM)
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `codeSensei.chat.baseUrl` | `https://openrouter.ai/api/v1` | OpenAI-compatible chat endpoint |
-| `codeSensei.chat.model` | `openai/gpt-5.6` | Chat model for Knowledge Check orchestration |
-| `codeSensei.chat.apiKey` | — | API key. Falls back to `OPENROUTER_API_KEY`, then `OPENAI_API_KEY` |
-| `codeSensei.chat.path` | `/chat/completions` | Endpoint path |
+| `AI CodeSensei.chat.baseUrl` | `https://openrouter.ai/api/v1` | OpenAI-compatible chat endpoint |
+| `AI CodeSensei.chat.model` | `openai/gpt-5.6` | Chat model for Knowledge Check orchestration |
+| `AI CodeSensei.chat.apiKey` | — | API key. Falls back to `OPENROUTER_API_KEY`, then `OPENAI_API_KEY` |
+| `AI CodeSensei.chat.path` | `/chat/completions` | Endpoint path |
 
 ### Audio
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `codeSensei.audio.inputDeviceId` | `-1` | PortAudio device ID. `-1` = system default. Use the in-app dropdown to pick. |
-| `codeSensei.audio.silenceSeconds` | `2` | Seconds of silence before ending a speech segment |
-| `codeSensei.audio.beepEnabled` | `true` | Play a beep when it's your turn to speak |
+| `AI CodeSensei.audio.inputDeviceId` | `-1` | PortAudio device ID. `-1` = system default. Use the in-app dropdown to pick. |
+| `AI CodeSensei.audio.silenceSeconds` | `2` | Seconds of silence before ending a speech segment |
+| `AI CodeSensei.audio.beepEnabled` | `true` | Play a beep when it's your turn to speak |
 
 ### ACP Agents
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `codeSensei.acp.selectedAgentId` | — | Pre-selected agent ID (`codex`, `devin`, etc.) |
-| `codeSensei.acp.agentConfigs` | `{}` | Per-agent config map (model, reasoning effort, sandbox, etc.) |
-| `codeSensei.acp.contextPrompt` | *(see default)* | Prompt sent to the agent for codebase analysis |
-| `codeSensei.acp.customAgents` | `[]` | Additional stdio-based ACP agents |
+| `AI CodeSensei.acp.selectedAgentId` | — | Pre-selected agent ID (`codex`, `devin`, etc.) |
+| `AI CodeSensei.acp.agentConfigs` | `{}` | Per-agent config map (model, reasoning effort, sandbox, etc.) |
+| `AI CodeSensei.acp.contextPrompt` | *(see default)* | Prompt sent to the agent for codebase analysis |
+| `AI CodeSensei.acp.customAgents` | `[]` | Additional stdio-based ACP agents |
 
 ### Interview
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `codeSensei.interview.maxQuestions` | `0` | Max questions (0 = unlimited) |
-| `codeSensei.interview.difficulty` | `adaptive` | `adaptive`, `junior`, `mid`, `senior`, `staff` |
-| `codeSensei.tutor.explanationMode` | `guided` | Guide depth: `quick`, `guided`, `deep` |
+| `AI CodeSensei.interview.maxQuestions` | `0` | Max questions (0 = unlimited) |
+| `AI CodeSensei.interview.difficulty` | `adaptive` | `adaptive`, `junior`, `mid`, `senior`, `staff` |
+| `AI CodeSensei.tutor.explanationMode` | `guided` | Guide depth: `quick`, `guided`, `deep` |
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| `CodeSensei: Start Knowledge Check` | Begin a voice-driven interview session |
-| `CodeSensei: Stop Active Operation` | Stop the current session or guide generation |
-| `CodeSensei: Generate Codebase Guide` | Create a `CODESENSEI.md` learning guide |
-| `CodeSensei: Refresh ACP Agents` | Re-scan for available agents |
-| `CodeSensei: Test Microphone` | Verify mic capture is working |
-| `CodeSensei: Test Speaker (TTS)` | Verify TTS playback is working |
-| `CodeSensei: Clear Cached Session` | Delete cached analysis and start fresh |
-| `CodeSensei: Show Logs` | Open the CodeSensei output channel |
+| `AI CodeSensei: Start Knowledge Check` | Begin a voice-driven interview session |
+| `AI CodeSensei: Stop Active Operation` | Stop the current session or guide generation |
+| `AI CodeSensei: Generate Codebase Guide` | Create a `AI CodeSensei.md` learning guide |
+| `AI CodeSensei: Refresh ACP Agents` | Re-scan for available agents |
+| `AI CodeSensei: Test Microphone` | Verify mic capture is working |
+| `AI CodeSensei: Test Speaker (TTS)` | Verify TTS playback is working |
+| `AI CodeSensei: Clear Cached Session` | Delete cached analysis and start fresh |
+| `AI CodeSensei: Show Logs` | Open the AI CodeSensei output channel |
 
 ## Architecture
 
