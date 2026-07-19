@@ -233,7 +233,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
   private showCapabilities(agentId: string): void {
     const agent = this.state.agents.find((item) => item.id === agentId);
     if (!agent) return;
-    const output = vscode.window.createOutputChannel('Interview Lele: Agent Capabilities');
+    const output = vscode.window.createOutputChannel('Codebase Tutor: Agent Capabilities');
     output.show();
     output.appendLine(JSON.stringify(agent.capabilities ?? { message: 'No capabilities probed. Click Refresh.' }, null, 2));
   }
@@ -249,7 +249,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Interview Lele</title>
+<title>Codebase Tutor</title>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
@@ -326,11 +326,11 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
   <header>
-    <h1>Interview Lele</h1>
+    <h1>Codebase Tutor</h1>
     <span id="state-badge" class="state-badge" data-state="idle">idle</span>
   </header>
   <div class="toolbar">
-    <button id="btn-start">Start Interview</button>
+    <button id="btn-start">Ask Me Anything</button>
     <button id="btn-stop" class="danger" disabled>Stop</button>
     <button id="btn-refresh" class="secondary">Refresh Agents</button>
     <button id="btn-settings" class="secondary">Settings</button>
@@ -373,7 +373,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
       </div>
 
       <div class="modal-section">
-        <div class="modal-section-title">Chat (Interviewer LLM)</div>
+        <div class="modal-section-title">Chat (Knowledge Evaluator)</div>
         <div class="modal-field"><label>Base URL</label><input id="chat-baseUrl" type="text" /></div>
         <div class="modal-field"><label>Model</label><input id="chat-model" type="text" /></div>
         <div class="modal-field"><label>API Key</label><input id="chat-apiKey" type="password" /><div class="modal-hint">OpenRouter API key. Falls back to OPENROUTER_API_KEY env var.</div></div>
@@ -388,7 +388,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
       </div>
 
       <div class="modal-section">
-        <div class="modal-section-title">Interview</div>
+        <div class="modal-section-title">Ask Me Anything</div>
         <div class="modal-field"><label>Max Questions (0 = unlimited)</label><input id="interview-maxQuestions" type="number" min="0" /></div>
         <div class="modal-field"><label>Difficulty</label><select id="interview-difficulty"><option value="adaptive">adaptive</option><option value="junior">junior</option><option value="mid">mid</option><option value="senior">senior</option><option value="staff">staff</option></select></div>
         <div class="modal-field"><label>Voice Mode</label><select id="voiceMode"><option value="auto">auto</option><option value="chained">chained</option><option value="realtime">realtime</option></select></div>
@@ -505,7 +505,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     div.className = 'msg ' + entry.kind;
     const who = document.createElement('div');
     who.className = 'who';
-    who.textContent = { agent: 'Interviewer', user: 'You', file: 'file', system: 'system', error: 'error' }[entry.kind] || entry.kind;
+    who.textContent = { agent: 'Codebase Tutor', user: 'You', file: 'file', system: 'system', error: 'error' }[entry.kind] || entry.kind;
     div.appendChild(who);
     const body = document.createElement('div');
     body.textContent = entry.text;
