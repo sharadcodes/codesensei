@@ -15,7 +15,7 @@ export interface GatherOptions {
 }
 
 /**
- * Spins up the ACP agent, asks it to produce a structured interview-relevant
+ * Spins up the ACP agent, asks it to produce structured codebase learning
  * summary of the codebase, and parses the JSON result.
  */
 export async function gatherCodebaseContext(opts: GatherOptions): Promise<CodebaseContext> {
@@ -23,6 +23,13 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
     throw new Error(`Agent "${opts.agent.name}" has no resolvable launch command on this platform.`);
   }
   const client = new AcpClient(opts.agent.resolved, opts.cwd, opts.agentConfig);
+  let sessionId: string | undefined;
+  let cancelled = false;
+  const cancellation = opts.token?.onCancellationRequested(() => {
+    cancelled = true;
+    if (sessionId) void client.cancel(sessionId);
+    setTimeout(() => { if (cancelled) void client.dispose(new vscode.CancellationError()); }, 1500);
+  });
   let collected = '';
   client.on('log', (l) => {
     const s = typeof l === 'string' ? l.trim() : String(l);
@@ -41,12 +48,13 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
 
   await client.start();
   try {
-    let sessionId: string;
     try {
       await client.initialize();
     } catch (e) {
+      if (cancelled) throw new vscode.CancellationError();
       throw new Error(`ACP initialize failed: ${(e as Error).message}`);
     }
+    if (cancelled) throw new vscode.CancellationError();
     try {
       sessionId = await client.newSession(opts.cwd, []);
     } catch (e) {
@@ -62,11 +70,14 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
     try {
       await client.prompt(sessionId, prompt);
     } catch (e) {
+      if (cancelled) throw new vscode.CancellationError();
       throw new Error(`ACP session/prompt failed: ${(e as Error).message}`);
     }
+    if (cancelled) throw new vscode.CancellationError();
     await client.closeSession(sessionId);
   } finally {
-    await client.dispose();
+    cancellation?.dispose();
+    await client.dispose(cancelled ? new vscode.CancellationError() : undefined);
   }
 
   return parseContext(collected, opts.cwd);
