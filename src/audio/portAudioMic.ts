@@ -134,6 +134,18 @@ export class PortAudioMicCapture extends EventEmitter {
   private lastLevelEmit = 0;
   private readonly levelEmitMs = 50; // emit level events at ~20fps
   private passthrough: boolean;
+  /**
+   * Target frame duration in ms, matching the frame sizes used by standard
+   * VAD implementations (WebRTC VAD / Silero VAD use 10/20/30ms frames).
+   * naudiodon2/PortAudio defaults `highwaterMark` to 16384 bytes (~512ms of
+   * 16kHz mono PCM16) when not set explicitly — far too coarse for
+   * responsive speech-start detection or accurate silence timing. We
+   * request small frames explicitly instead of relying on that default.
+   */
+  private readonly frameMs = 20;
+  private readonly frameBytes: number;
+  /** Chunks-per-second at `frameMs`, used to throttle debug logging. */
+  private readonly framesPerSecond: number;
 
   constructor(opts: {
     sampleRate?: number;
@@ -157,10 +169,12 @@ export class PortAudioMicCapture extends EventEmitter {
     this.rmsStart = opts.rmsStart ?? 0.006;         // lower threshold for speech start
     this.rmsStop = opts.rmsStop ?? 0.004;           // lower threshold for silence
     this.passthrough = opts.passthrough ?? false;
+    // 2 bytes/sample (PCM16) per channel, at `frameMs` duration.
+    this.frameBytes = Math.max(2, Math.round(this.sampleRate * this.channels * 2 * (this.frameMs / 1000)));
+    this.framesPerSecond = Math.round(1000 / this.frameMs);
     // Pre-roll: keep last N chunks (~500ms) so we don't miss the start of speech
     const preRollMs = opts.preRollMs ?? 500;
-    // Each chunk at 16kHz/16bit/mono is ~256 samples = 16ms, so ~31 chunks for 500ms
-    this.preRollCount = Math.max(10, Math.ceil(preRollMs / 16));
+    this.preRollCount = Math.max(5, Math.ceil(preRollMs / this.frameMs));
   }
 
   /** List available input devices, deduplicated by name. */
@@ -238,6 +252,10 @@ export class PortAudioMicCapture extends EventEmitter {
           sampleFormat: pa.SampleFormat16Bit,
           sampleRate: this.sampleRate,
           deviceId,
+          // Request small (~20ms) frames explicitly. naudiodon2/PortAudio
+          // default this to 16384 bytes (~512ms @ 16kHz mono), which makes
+          // VAD start/stop detection multiple seconds behind real speech.
+          highwaterMark: this.frameBytes,
         },
       });
     } catch (e) {
@@ -258,12 +276,18 @@ export class PortAudioMicCapture extends EventEmitter {
     this.emit('log', `PortAudio mic started (${this.sampleRate}Hz, ${this.channels}ch)`);
   }
 
-  /** Mute the mic: drop incoming audio and reset VAD state. Used during TTS playback to prevent feedback. */
+  /**
+   * Mute the mic: drop incoming audio and reset VAD state. Used both during
+   * TTS playback (prevents the assistant hearing its own voice — there is no
+   * acoustic echo cancellation here) and while a turn is being processed
+   * (prevents a second overlapping utterance from firing a concurrent turn).
+   */
   pause(): void {
     this.muted = true;
     // Reset VAD state so we don't emit a stale speech_end when resuming
     this.recording = false;
     this.chunks = [];
+    this.preRollChunks = [];
     this.loudFrames = 0;
     this.quietSince = Date.now();
   }
@@ -324,7 +348,7 @@ export class PortAudioMicCapture extends EventEmitter {
 
     // Debug: log RMS every ~1s
     this.chunkCount = (this.chunkCount || 0) + 1;
-    if (this.chunkCount % 62 === 0) {
+    if (this.chunkCount % this.framesPerSecond === 0) {
       this.emit('log', `RMS=${rms.toFixed(4)} peak=${maxSample} rec=${this.recording} loudFrames=${this.loudFrames} preRoll=${this.preRollChunks.length}`);
     }
 
@@ -335,7 +359,7 @@ export class PortAudioMicCapture extends EventEmitter {
       this.preRollChunks.push(chunk);
       if (this.preRollChunks.length > this.preRollCount) this.preRollChunks.shift();
 
-      // Detect speech start — require 5 consecutive loud frames (~80ms) to avoid false triggers
+      // Detect speech start — require 5 consecutive loud frames (~100ms @ 20ms/frame) to avoid false triggers
       if (rms > this.rmsStart) {
         this.loudFrames++;
         if (this.loudFrames >= 5) {
@@ -343,7 +367,7 @@ export class PortAudioMicCapture extends EventEmitter {
           // Prepend pre-roll buffer so we capture the beginning of speech
           this.chunks = [...this.preRollChunks];
           this.preRollChunks = [];
-          this.recordingStarted = now2 - (this.preRollCount * 16); // approximate start
+          this.recordingStarted = now2 - (this.chunks.length * this.frameMs); // approximate start (includes pre-roll)
           this.quietSince = 0;
           this.loudFrames = 0;
           this.emit('speech_start');
@@ -378,15 +402,24 @@ export class PortAudioMicCapture extends EventEmitter {
 
   private finishRecording(): void {
     this.recording = false;
+    // Snapshot + clear `this.chunks` BEFORE emitting 'speech_end'. Listeners
+    // (e.g. the orchestrator pausing the mic for the duration of the turn)
+    // run synchronously inside `emit()` and may call `pause()`, which also
+    // clears `this.chunks` — reading it afterwards would silently drop the
+    // just-captured audio.
+    const chunksSnapshot = this.chunks;
+    this.chunks = [];
     this.emit('speech_end');
 
-    const pcm = Buffer.concat(this.chunks);
-    this.chunks = [];
+    const pcm = Buffer.concat(chunksSnapshot);
 
     // Skip if too short (< 0.3s)
     const durationMs = (pcm.length / (this.sampleRate * this.channels * 2)) * 1000;
     if (durationMs < 300) {
       this.emit('log', `Skipping short recording (${durationMs.toFixed(0)}ms)`);
+      // No 'recording' event will follow — tell listeners so they can
+      // resume the mic (it may have been paused in the 'speech_end' handler).
+      this.emit('speech_discarded');
       return;
     }
 

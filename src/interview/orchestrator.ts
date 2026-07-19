@@ -114,7 +114,7 @@ export class InterviewOrchestrator {
 
     // Validate STT key (still needed for transcription)
     if (!config.stt.apiKey) {
-      onEvent({ kind: 'error', text: 'No STT API key. Set interviewLele.stt.apiKey or OPENROUTER_API_KEY.' });
+      onEvent({ kind: 'error', text: 'No STT API key. Set codeSensei.stt.apiKey or OPENROUTER_API_KEY.' });
       return;
     }
 
@@ -134,7 +134,7 @@ export class InterviewOrchestrator {
     // The ACP agent is NOT used for chat — it doesn't follow the <open_file> tag
     // convention needed for file highlighting during the interview.
     if (!config.chat.apiKey) {
-      onEvent({ kind: 'error', text: 'No chat API key. Set interviewLele.chat.apiKey or OPENROUTER_API_KEY.' });
+      onEvent({ kind: 'error', text: 'No chat API key. Set codeSensei.chat.apiKey or OPENROUTER_API_KEY.' });
       return;
     }
 
@@ -171,6 +171,23 @@ export class InterviewOrchestrator {
     });
     this.paMic.on('speech_end', () => {
       this.setState('thinking', onEvent);
+      // Half-duplex turn-taking: stop listening as soon as the user's
+      // utterance ends, for the entire duration of this turn (STT → chat →
+      // TTS). Without this, the VAD stays armed while we're generating the
+      // response, so a second utterance mid-turn fires a second, overlapping
+      // `processCandidateWav` call — racing transcript order, TTS playback,
+      // and mic mute state. Resumed by `speakText`'s `finally` (normal path)
+      // or the safety-net `resume()` calls below (error / discarded paths).
+      this.paMic?.pause();
+    });
+    this.paMic.on('speech_discarded', () => {
+      // finishRecording() decided the utterance was too short to process —
+      // no 'recording' event (and therefore no speakText) will follow, so we
+      // must resume the mic here or it stays muted forever.
+      if (!this.cancelled) {
+        this.paMic?.resume();
+        this.setState('listening', onEvent);
+      }
     });
     this.paMic.on('recording', async (wav: Buffer) => {
       if (this.cancelled || !this.chained) return;
@@ -178,10 +195,12 @@ export class InterviewOrchestrator {
     });
 
     this.setState('listening', onEvent);
-    onEvent({ kind: 'log', text: `Ask Me Anything is live (chained: PortAudio mic → Voxtral STT → OpenAI-compatible chat → Kokoro TTS). Speak naturally.` });
+    onEvent({ kind: 'log', text: `Knowledge Check is live (chained: PortAudio mic → Voxtral STT → OpenAI-compatible chat → Kokoro TTS). Speak naturally.` });
 
-    // Start mic
+    // Start mic, muted until the opening turn has been spoken so we don't
+    // capture (and race against) speech before the greeting is even asked.
     this.paMic.start();
+    this.paMic.pause();
 
     // Opening turn
     await this.doOpeningTurn(onEvent);
@@ -212,7 +231,14 @@ export class InterviewOrchestrator {
       await this.speakText(opening.text, onEvent);
       if (!this.cancelled) this.setState('listening', onEvent);
     } catch (e) {
+      // If we're already cancelled, this is almost certainly the abort()
+      // fired by stop() unblocking an in-flight fetch — not a real failure.
+      if (this.cancelled) return;
       onEvent({ kind: 'error', text: `Opening turn failed: ${(e as Error).message}` });
+      // speakText (which would normally resume the mic) may never have run —
+      // make sure we don't leave the mic muted forever.
+      this.paMic?.resume();
+      this.setState('listening', onEvent);
     }
   }
 
@@ -257,8 +283,15 @@ export class InterviewOrchestrator {
         this.setState('listening', onEvent);
       }
     } catch (e) {
+      // If we're already cancelled, this is almost certainly the abort()
+      // fired by stop() unblocking an in-flight fetch — not a real failure.
+      // Don't surface an error and don't stomp the 'ended' state stop() set.
+      if (this.cancelled) return;
       onEvent({ kind: 'error', text: `Chained turn failed: ${(e as Error).message}` });
       logger.error(`[chained] ${(e as Error).message}`);
+      // speakText (which would normally resume the mic) may not have been
+      // reached (e.g. STT/chat failed first) — don't leave the mic muted.
+      this.paMic?.resume();
       this.setState('listening', onEvent);
     }
   }
@@ -272,9 +305,13 @@ export class InterviewOrchestrator {
     this.paMic?.pause();
     try {
       const audio = await this.chained.synthesize(text);
+      if (this.cancelled) return; // stop() was called while synthesizing — don't play it
       logger.log(`[tts] Synthesized ${audio.length} bytes for "${text.slice(0, 60)}..."`);
       await this.playMp3Blocking(audio);
     } catch (e) {
+      // If we're already cancelled, this is almost certainly the abort()
+      // fired by stop() — not a real failure, don't surface it.
+      if (this.cancelled) return;
       logger.error(`[tts] Synthesis failed: ${(e as Error).message}`);
       onEvent({ kind: 'error', text: `TTS failed: ${(e as Error).message}` });
     } finally {
@@ -308,7 +345,7 @@ export class InterviewOrchestrator {
     onEvent({ kind: 'state', state: s });
     // Play beep when entering listening state (interviewer finished speaking)
     if (s === 'listening' && prev !== 'listening' && !this.cancelled) {
-      const cfg = vscode.workspace.getConfiguration('interviewLele');
+      const cfg = vscode.workspace.getConfiguration('codeSensei');
       const beepEnabled = cfg.get('audio.beepEnabled', true);
       if (beepEnabled && this.homeView) {
         playListeningBeep(this.homeView);
@@ -326,6 +363,12 @@ export class InterviewOrchestrator {
   async stop(onEvent?: (e: InterviewEvent) => void): Promise<void> {
     if (this.cancelled && this.state === 'ended') return; // already stopped
     this.cancelled = true;
+    // Silence any TTS/beep audio currently playing and cancel any in-flight
+    // STT/TTS/chat request immediately — otherwise the assistant keeps
+    // talking (and speakText's await keeps blocking) until whatever was
+    // already in flight finishes on its own.
+    try { this.homeView?.stopAudio(); } catch { /* ignore */ }
+    try { this.chained?.abort(); } catch { /* ignore */ }
     // Emit 'ended' immediately so the UI responds instantly
     if (onEvent) this.setState('ended', onEvent);
     // Persist transcript synchronously (fast, non-blocking)

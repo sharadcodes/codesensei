@@ -28,9 +28,21 @@ export class ChainedVoiceProvider extends EventEmitter {
   private maxQuestions = 0;
   private acpClient: AcpClient | null = null;
   private acpSessionId: string | null = null;
+  /** Aborts any in-flight STT/TTS/chat fetch so "Stop" takes effect immediately
+   *  instead of waiting for a slow network response to resolve. */
+  private abortController = new AbortController();
 
   constructor(private cfg: FullConfig) {
     super();
+  }
+
+  /** Cancel any in-flight STT/TTS/chat request and arm a fresh controller for future calls. */
+  abort(): void {
+    this.abortController.abort();
+    this.abortController = new AbortController();
+    if (this.acpClient && this.acpSessionId) {
+      void this.acpClient.cancel(this.acpSessionId).catch(() => { /* ignore */ });
+    }
   }
 
   /** Set the ACP client + session to use for chat (instead of HTTP API). */
@@ -79,7 +91,7 @@ export class ChainedVoiceProvider extends EventEmitter {
     const formData = buildMultipart(audio, format, stt.model, stt.language);
     const headers: Record<string, string> = { 'Content-Type': `multipart/form-data; boundary=${formData.boundary}` };
     if (stt.apiKey && stt.apiKey !== 'not-needed') headers['Authorization'] = `Bearer ${stt.apiKey}`;
-    const res = await fetch(url, { method: 'POST', headers, body: formData.body });
+    const res = await fetch(url, { method: 'POST', headers, body: formData.body, signal: this.abortController.signal });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`STT failed (${res.status}): ${text.slice(0, 500)}`);
@@ -106,6 +118,7 @@ export class ChainedVoiceProvider extends EventEmitter {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: this.abortController.signal,
     });
     if (!res.ok) {
       // Kokoro may not support `instructions`; retry without
@@ -124,7 +137,7 @@ export class ChainedVoiceProvider extends EventEmitter {
 
   /** Internal: generate the interviewer response without pushing candidate text to history. */
   private async generateTurn(candidateText: string): Promise<{ text: string; openFile?: { filePath: string; lineStart: number; lineEnd: number }; endInterview?: boolean }> {
-    const systemPrompt = `You are a friendly, rigorous codebase knowledge evaluator running a live, voice-based Ask Me Anything session about THIS codebase:
+    const systemPrompt = `You are a friendly, rigorous codebase knowledge evaluator running a live, voice-based Knowledge Check session about THIS codebase:
 
 PROJECT SUMMARY:
 ${this.contextSummary}
@@ -251,7 +264,7 @@ RULES:
     };
 
     logger.log(`[chat] POST ${url} model=${chat.model} apiKey=${chat.apiKey ? 'yes' : 'NO'}`);
-    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: this.abortController.signal });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Chat failed (${res.status}): ${text.slice(0, 500)}`);
@@ -272,7 +285,7 @@ RULES:
 
   /** Generate the opening greeting + first question. Does NOT push a fake candidate message to history. */
   async opening(): Promise<{ text: string; openFile?: { filePath: string; lineStart: number; lineEnd: number } }> {
-    return this.generateTurn('Begin Ask Me Anything now. Greet the user briefly, then open the first file and ask your first knowledge-check question.');
+    return this.generateTurn('Begin the Knowledge Check now. Greet the user briefly, then open the first file and ask your first knowledge-check question.');
   }
 
   /** Clean up ACP session if active. */
