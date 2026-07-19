@@ -22,7 +22,7 @@ let activeOperation: { kind: 'interview' | 'guide'; source: vscode.CancellationT
 
 export function activate(context: vscode.ExtensionContext): void {
   logger.init();
-  logger.log('CodeSensei extension activating.');
+  logger.log('AI CodeSensei extension activating.');
   initAgentConfigStorage(context.globalState);
 
   homeView = new HomeViewProvider(context.extensionUri);
@@ -182,7 +182,7 @@ async function startInterview(context: vscode.ExtensionContext, operationToken: 
         codebaseContext = await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
-            title: `CodeSensei: ${agent.name} is analyzing the codebase`,
+            title: `AI CodeSensei: ${agent.name} is analyzing the codebase`,
             cancellable: true,
           },
           async (progress, token) => {
@@ -306,7 +306,7 @@ async function createTutorGuide(): Promise<void> {
     { label: 'Deep Dive + build/config', description: '15+ minutes · include approved build and infrastructure files', mode: 'deep' as ExplanationMode, buildAccess: 'include-build-config' as BuildAccess },
   ];
   guideChoices.sort((a, b) => Number(b.mode === preferredMode && b.buildAccess === 'source-only') - Number(a.mode === preferredMode && a.buildAccess === 'source-only'));
-  const picked = await vscode.window.showQuickPick(guideChoices, { title: 'CodeSensei: Guide options', placeHolder: 'Choose explanation depth and repository access' });
+  const picked = await vscode.window.showQuickPick(guideChoices, { title: 'AI CodeSensei: Guide options', placeHolder: 'Choose explanation depth and repository access' });
   if (!picked) return;
   await vscode.workspace.getConfiguration('codeSensei').update('tutor.explanationMode', picked.mode, vscode.ConfigurationTarget.Global);
 
@@ -331,7 +331,7 @@ async function createTutorGuide(): Promise<void> {
     const guide = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `CodeSensei: ${agent.name} is creating your guide`,
+        title: `AI CodeSensei: ${agent.name} is creating your guide`,
         cancellable: true,
       },
       async (progress, token) => {
@@ -354,7 +354,7 @@ async function createTutorGuide(): Promise<void> {
     const document = await vscode.workspace.openTextDocument(outputUri);
     await vscode.window.showTextDocument(document, { preview: false });
     homeView?.postStatus('Code Tutor guide is ready: CODESENSEI.md');
-    vscode.window.showInformationMessage('CodeSensei created CODESENSEI.md.');
+    vscode.window.showInformationMessage('AI CodeSensei created CODESENSEI.md.');
   } catch (error) {
     if (error instanceof vscode.CancellationError || operation.source.token.isCancellationRequested) {
       homeView?.postStatus('Guide generation cancelled.');
@@ -389,7 +389,7 @@ function finishOperation(operation: NonNullable<typeof activeOperation>): void {
 
 function showLogs(notify: boolean): void {
   logger.show();
-  if (notify) void vscode.window.showInformationMessage('Check the CodeSensei channel in the Output panel for detailed logs.');
+  if (notify) void vscode.window.showInformationMessage('Check the AI CodeSensei channel in the Output panel for detailed logs.');
 }
 
 async function clearCachedSession(context: vscode.ExtensionContext): Promise<void> {
@@ -399,7 +399,7 @@ async function clearCachedSession(context: vscode.ExtensionContext): Promise<voi
     return;
   }
   await clearSession(context, workspaceRoot);
-  vscode.window.showInformationMessage('CodeSensei: Cached session cleared. Next Knowledge Check will re-analyze from scratch.');
+  vscode.window.showInformationMessage('AI CodeSensei: Cached session cleared. Next Knowledge Check will re-analyze from scratch.');
   logger.log('Cached session cleared by user.');
 }
 
