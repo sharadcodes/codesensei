@@ -10,6 +10,10 @@ import { MicCapture } from './audio/capture';
 import { AudioPlayback } from './audio/playback';
 import { logger } from './logger';
 import { getAgentConfig, initAgentConfigStorage } from './acp/agentConfigUi';
+import { loadSession, saveSession, clearSession, StoredSession } from './interview/sessionStore';
+import { findRecentCodexSessions, extractRelevantText } from './acp/codexHistory';
+import { ChainedTurn } from './realtime/chained';
+import { execSync } from 'child_process';
 
 let orchestrator: InterviewOrchestrator | null = null;
 let homeView: HomeViewProvider | null = null;
@@ -32,7 +36,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('interviewLele.startInterview', () => startInterview(context)),
     vscode.commands.registerCommand('interviewLele.stopInterview', () => stopInterview()),
     vscode.commands.registerCommand('interviewLele.testMic', () => testMic()),
-    vscode.commands.registerCommand('interviewLele.testSpeaker', () => testSpeaker())
+    vscode.commands.registerCommand('interviewLele.testSpeaker', () => testSpeaker()),
+    vscode.commands.registerCommand('interviewLele.clearSession', () => clearCachedSession(context))
   );
 }
 
@@ -71,6 +76,59 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
       await homeView.refresh();
     }
   }
+
+  // ── Check for cached session ──────────────────────────────────────────
+  const cached = await loadSession(context, workspaceRoot);
+  let priorTranscript: ChainedTurn[] | undefined;
+  let codebaseContext: CodebaseContext | undefined;
+
+  if (cached) {
+    const ageMs = Date.now() - cached.analyzedAt;
+    const ageStr = ageMs < 60000 ? `${Math.round(ageMs / 1000)}s ago`
+      : ageMs < 3600000 ? `${Math.round(ageMs / 60000)}m ago`
+      : `${Math.round(ageMs / 3600000)}h ago`;
+
+    // Check git HEAD for staleness warning
+    let staleWarning = '';
+    try {
+      const head = execSync('git rev-parse HEAD', { cwd: workspaceRoot, encoding: 'utf8', timeout: 3000 }).trim();
+      if (cached.gitHead && cached.gitHead !== head) {
+        staleWarning = ' (⚠ codebase changed since last analysis)';
+      }
+    } catch { /* not a git repo or git unavailable */ }
+
+    const choice = await vscode.window.showQuickPick(
+      [
+        {
+          label: 'Resume previous interview',
+          description: `Continue from ${cached.transcript.length} prior turns${staleWarning}`,
+          detail: `Analyzed ${ageStr} with "${cached.agentId}" — ${cached.context.topics.length} topics`,
+        },
+        {
+          label: 'Start fresh (reuse analysis)',
+          description: 'Same codebase context, new conversation',
+          detail: `Skip re-analysis, start Q&A from scratch`,
+        },
+        {
+          label: 'Re-analyze from scratch',
+          description: 'Discard cache, run full ACP analysis again',
+          detail: 'Slowest option — use if code changed significantly',
+        },
+      ],
+      { placeHolder: `Cached session found (analyzed ${ageStr})${staleWarning}. Choose an option:` }
+    );
+
+    if (!choice) return; // user dismissed
+
+    if (choice.label === 'Resume previous interview') {
+      codebaseContext = cached.context;
+      priorTranscript = cached.transcript;
+    } else if (choice.label === 'Start fresh (reuse analysis)') {
+      codebaseContext = cached.context;
+    }
+    // else: Re-analyze — leave codebaseContext undefined, fall through to full analysis
+  }
+
   const agent = await pickAgent();
   if (!agent) return;
   if (!agent.available || !agent.resolved) {
@@ -84,7 +142,6 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
 
   homeView?.show();
   homeView?.setInterviewState('connecting');
-  homeView?.postStatus(`Gathering codebase context with "${agent.name}"...`);
 
   const onEvent = (e: InterviewEvent) => {
     homeView?.postEvent(e);
@@ -102,44 +159,83 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
     if (e.kind === 'log' && e.text) logger.log(e.text);
   };
 
-  let codebaseContext: CodebaseContext;
   const tokenSrc = new vscode.CancellationTokenSource();
   let agentConfig: Awaited<ReturnType<typeof getAgentConfig>> | undefined;
-  try {
-    if (agent.resolved) {
-      agentConfig = await getAgentConfig(agent.id);
-      logger.log(`Using agent config for ${agent.id}: ${JSON.stringify(agentConfig)}`);
-      codebaseContext = await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: `Interview Lele: ${agent.name} is analyzing the codebase`,
-          cancellable: true,
-        },
-        async (progress, token) => {
-          progress.report({ increment: 0, message: 'Starting ACP agent...' });
-          return gatherCodebaseContext({
-            cwd: workspaceRoot,
-            agent,
-            agentConfig,
-            contextPrompt: cfg.acp.contextPrompt,
-            onProgress: (msg) => {
-              progress.report({ message: msg });
-              homeView?.postStatus(msg);
-              logger.log(msg);
-            },
-            onAgentMessage: () => {
-              /* streamed; not posted to keep UI clean during analysis */
-            },
-            token,
-          });
-        }
-      );
-    } else {
+
+  // ── If no cached context, run full analysis ──────────────────────────
+  if (!codebaseContext) {
+    homeView?.postStatus(`Gathering codebase context with "${agent.name}"...`);
+    try {
+      if (agent.resolved) {
+        agentConfig = await getAgentConfig(agent.id);
+        logger.log(`Using agent config for ${agent.id}: ${JSON.stringify(agentConfig)}`);
+        codebaseContext = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: `Interview Lele: ${agent.name} is analyzing the codebase`,
+            cancellable: true,
+          },
+          async (progress, token) => {
+            progress.report({ increment: 0, message: 'Starting ACP agent...' });
+            return gatherCodebaseContext({
+              cwd: workspaceRoot,
+              agent,
+              agentConfig,
+              contextPrompt: cfg.acp.contextPrompt,
+              onProgress: (msg) => {
+                progress.report({ message: msg });
+                homeView?.postStatus(msg);
+                logger.log(msg);
+              },
+              onAgentMessage: () => {
+                /* streamed; not posted to keep UI clean during analysis */
+              },
+              token,
+            });
+          }
+        );
+      } else {
+        codebaseContext = await fallbackContext(workspaceRoot);
+      }
+    } catch (e) {
+      vscode.window.showErrorMessage(`Failed to gather context: ${(e as Error).message}. Falling back to workspace scan.`);
       codebaseContext = await fallbackContext(workspaceRoot);
     }
-  } catch (e) {
-    vscode.window.showErrorMessage(`Failed to gather context: ${(e as Error).message}. Falling back to workspace scan.`);
-    codebaseContext = await fallbackContext(workspaceRoot);
+
+    // ── Codex CLI history enrichment (best-effort, never blocks) ────────
+    try {
+      const codexSessions = findRecentCodexSessions(workspaceRoot, 2);
+      if (codexSessions.length > 0) {
+        const snippets = codexSessions.map((s) => extractRelevantText(s.path, 2000)).filter((t) => t.length > 0);
+        if (snippets.length > 0) {
+          const enrichment = snippets.join('\n\n---\n\n');
+          codebaseContext = {
+            ...codebaseContext,
+            summary: `${codebaseContext.summary}\n\nPRIOR CONTEXT FROM CODEX CLI HISTORY:\n${enrichment}`,
+          };
+          logger.log(`[codexHistory] Enriched analysis with ${snippets.length} Codex CLI session(s)`);
+        }
+      }
+    } catch (e) {
+      logger.log(`[codexHistory] Enrichment skipped: ${(e as Error).message}`);
+    }
+
+    // ── Save the freshly analyzed context ───────────────────────────────
+    let gitHead: string | undefined;
+    try {
+      gitHead = execSync('git rev-parse HEAD', { cwd: workspaceRoot, encoding: 'utf8', timeout: 3000 }).trim();
+    } catch { /* not a git repo */ }
+
+    const session: StoredSession = {
+      workspaceRoot,
+      analyzedAt: Date.now(),
+      context: codebaseContext,
+      agentId: agent.id,
+      supportsAcpResume: false,
+      gitHead,
+      transcript: [],
+    };
+    await saveSession(context, session);
   }
 
   homeView?.postStatus(`Context ready. ${codebaseContext.topics.length} topics, ${codebaseContext.files.length} files. Connecting voice...`);
@@ -154,6 +250,8 @@ async function startInterview(context: vscode.ExtensionContext): Promise<void> {
     token: tokenSrc.token,
     agent,
     agentConfig,
+    priorTranscript,
+    extContext: context,
   });
 }
 
@@ -162,6 +260,17 @@ async function stopInterview(): Promise<void> {
   await orchestrator.stop((e) => homeView?.postEvent(e));
   homeView?.postStatus('Interview stopped.');
   homeView?.setInterviewState('ended');
+}
+
+async function clearCachedSession(context: vscode.ExtensionContext): Promise<void> {
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!workspaceRoot) {
+    vscode.window.showErrorMessage('Open a workspace folder first.');
+    return;
+  }
+  await clearSession(context, workspaceRoot);
+  vscode.window.showInformationMessage('Interview Lele: Cached session cleared. Next interview will re-analyze from scratch.');
+  logger.log('Cached session cleared by user.');
 }
 
 async function pickAgent(): Promise<DiscoveredAgent | null> {
