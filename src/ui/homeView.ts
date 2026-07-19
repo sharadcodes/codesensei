@@ -575,6 +575,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
     background: rgba(255, 255, 255, 0.01);
     overflow: visible;
     transition: background 0.2s ease, border-color 0.2s ease;
+    flex: 0 0 auto;
   }
   .modal-section.collapsed {
     overflow: hidden;
