@@ -4,6 +4,8 @@ src/**
 scripts/**
 site/**
 node_modules/**
+.venv/**
+.venv
 tsconfig.json
 .eslintrc*
 **/*.map
@@ -28,3 +30,4 @@ media/codesensei-logo.ico
 media/icon.svg
 CHANGELOG.md
 REBRAND_REPORT.md
+logo.png
