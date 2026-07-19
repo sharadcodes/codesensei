@@ -84,7 +84,7 @@ export async function configureAgentMenu(
   const actions: Array<{ label: string; description?: string; detail?: string; action: string }> = [
     {
       label: '$(check) Select this agent',
-      description: 'use for interviews',
+      description: 'use for codebase learning and knowledge checks',
       action: 'select',
     },
     {
@@ -136,14 +136,14 @@ export async function configureAgentMenu(
 
   const picked = await vscode.window.showQuickPick(actions, {
     placeHolder: `${agent.name} — configure`,
-    title: 'Interview Lele: ACP Agent Configuration',
+    title: 'Codebase Tutor: ACP Agent Configuration',
   });
   if (!picked) return;
 
   switch (picked.action) {
     case 'select':
       onSelect(agent);
-      vscode.window.showInformationMessage(`Interview Lele: selected agent "${agent.name}".`);
+      vscode.window.showInformationMessage(`Codebase Tutor: selected agent "${agent.name}".`);
       return;
 
     case 'model': {
@@ -164,7 +164,7 @@ export async function configureAgentMenu(
       } else {
         const pick = await vscode.window.showQuickPick(items, {
           placeHolder: 'Choose model',
-          title: 'Interview Lele: Agent Model',
+          title: 'Codebase Tutor: Agent Model',
         });
         chosen = pick?.model;
       }
@@ -183,7 +183,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose reasoning effort',
-        title: 'Interview Lele: Reasoning Effort',
+        title: 'Codebase Tutor: Reasoning Effort',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, reasoningEffort: pick.value as ReasoningEffort });
@@ -206,7 +206,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose scope / permission level',
-        title: 'Interview Lele: Agent Scope',
+        title: 'Codebase Tutor: Agent Scope',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, agentMode: pick.value as AgentMode });
@@ -229,7 +229,7 @@ export async function configureAgentMenu(
       }));
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: 'Choose sandbox mode',
-        title: 'Interview Lele: Sandbox Mode',
+        title: 'Codebase Tutor: Sandbox Mode',
       });
       if (pick) {
         await saveAgentConfig(agent.id, { ...config, sandboxMode: pick.value as SandboxMode });
@@ -252,7 +252,7 @@ export async function configureAgentMenu(
     }
 
     case 'capabilities': {
-      const out = vscode.window.createOutputChannel('Interview Lele: Agent Capabilities');
+      const out = vscode.window.createOutputChannel('Codebase Tutor: Agent Capabilities');
       out.show();
       out.appendLine(`Agent: ${agent.name} (${agent.id})`);
       out.appendLine(`Available: ${agent.available}`);
@@ -282,7 +282,7 @@ export async function configureAgentMenu(
       const r = agent.resolved;
       const cmd = `${r.cmd} ${r.args.join(' ')}`;
       const env = buildEnvPreview(config);
-      const out = vscode.window.createOutputChannel('Interview Lele: Agent Command');
+      const out = vscode.window.createOutputChannel('Codebase Tutor: Agent Command');
       out.show();
       out.appendLine(`Agent: ${agent.name} (${agent.id})`);
       out.appendLine(`Distribution: ${r.distributionType}`);
