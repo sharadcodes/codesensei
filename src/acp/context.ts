@@ -41,8 +41,17 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
 
   await client.start();
   try {
-    await client.initialize();
-    const sessionId = await client.newSession(opts.cwd, []);
+    let sessionId: string;
+    try {
+      await client.initialize();
+    } catch (e) {
+      throw new Error(`ACP initialize failed: ${(e as Error).message}`);
+    }
+    try {
+      sessionId = await client.newSession(opts.cwd, []);
+    } catch (e) {
+      throw new Error(`ACP session/new failed: ${(e as Error).message}`);
+    }
     const prompt = [
       { type: 'text', text: opts.contextPrompt },
       {
@@ -50,7 +59,11 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
         text: 'Return ONLY valid minified JSON (no prose, no markdown fences) with the schema described above. Use repo-relative file paths.',
       },
     ];
-    await client.prompt(sessionId, prompt);
+    try {
+      await client.prompt(sessionId, prompt);
+    } catch (e) {
+      throw new Error(`ACP session/prompt failed: ${(e as Error).message}`);
+    }
     await client.closeSession(sessionId);
   } finally {
     await client.dispose();

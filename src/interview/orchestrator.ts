@@ -9,11 +9,12 @@ import { AcpClient } from '../acp/client';
 import { DiscoveredAgent } from '../acp/registry';
 import { AgentConfig } from '../acp/agentConfig';
 import { OpenAIRealtimeProvider } from '../realtime/openai';
-import { ChainedVoiceProvider } from '../realtime/chained';
+import { ChainedVoiceProvider, ChainedTurn } from '../realtime/chained';
 import { RealtimeTool } from '../realtime/provider';
 import { openAndHighlight, clearHighlights } from '../ui/highlight';
 import { logger } from '../logger';
 import { HomeViewProvider } from '../ui/homeView';
+import { StoredSession, saveSession } from './sessionStore';
 
 export interface InterviewEvent {
   kind:
@@ -47,6 +48,10 @@ export interface InterviewStartOptions {
   token?: vscode.CancellationToken;
   agent?: DiscoveredAgent;
   agentConfig?: AgentConfig;
+  /** Prior conversation turns to seed when resuming a previous interview. */
+  priorTranscript?: ChainedTurn[];
+  /** VS Code context for persisting session state (cache + transcript). */
+  extContext?: vscode.ExtensionContext;
 }
 
 const OPEN_FILE_TOOL: RealtimeTool = {
@@ -85,6 +90,8 @@ export class InterviewOrchestrator {
   private cancelled = false;
   private homeView: HomeViewProvider | null = null;
   private workspaceRoot = '';
+  private extContext: vscode.ExtensionContext | null = null;
+  private sessionBase: StoredSession | null = null;
 
   /** Set the homeView reference for webview-driven audio I/O (chained mode). */
   setHomeView(hv: HomeViewProvider): void {
@@ -103,6 +110,20 @@ export class InterviewOrchestrator {
     const { config, context, workspaceRoot, onEvent } = opts;
     this.cancelled = false;
     this.questionCount = 0;
+    this.workspaceRoot = workspaceRoot;
+    this.extContext = opts.extContext ?? null;
+
+    // Initialize session base for continuous persistence
+    if (this.extContext) {
+      this.sessionBase = {
+        workspaceRoot,
+        analyzedAt: Date.now(),
+        context,
+        agentId: opts.agent?.id ?? '',
+        supportsAcpResume: false,
+        transcript: opts.priorTranscript ? [...opts.priorTranscript] : [],
+      };
+    }
 
     // Decide mode: auto → chained if realtime key missing, else realtime
     const mode = this.resolveMode(config);
@@ -111,6 +132,13 @@ export class InterviewOrchestrator {
     } else {
       await this.startRealtime(opts);
     }
+  }
+
+  /** Persist the current session state (context + transcript) to global storage. */
+  private persistSession(): void {
+    if (!this.extContext || !this.sessionBase) return;
+    this.sessionBase.transcript = this.chained?.transcript ?? this.sessionBase.transcript;
+    void saveSession(this.extContext, this.sessionBase);
   }
 
   private resolveMode(config: FullConfig): 'realtime' | 'chained' {
@@ -155,6 +183,11 @@ ${filesBrief}
 
 SUGGESTED INTERVIEW TOPICS (use open_file before asking about each):
 ${topicsBrief}
+${opts.priorTranscript && opts.priorTranscript.length > 0 ? `
+PREVIOUS INTERVIEW HISTORY (you are resuming a prior session):
+${opts.priorTranscript.map((t) => `${t.role === 'interviewer' ? 'Interviewer' : 'Candidate'}: ${t.text}`).join('\n')}
+
+Continue the interview from where you left off. Do NOT repeat questions already asked.` : ''}
 
 INTERVIEWER PERSONA — behave like a real human interviewer:
 - Speak naturally and concisely, as if on a phone/video call. No bullet points, no lectures, no markdown.
@@ -300,9 +333,11 @@ RULES:
     this.setState('listening', onEvent);
     onEvent({ kind: 'log', text: 'Interview live (realtime mode). Speak naturally — say "stop" or use the Stop command to end.' });
 
-    provider.sendText(
-      `Begin the interview now. Greet the candidate briefly, then call open_file for the first topic and ask your first question.`
-    );
+    const openingText = opts.priorTranscript && opts.priorTranscript.length > 0
+      ? `Resume the interview now. Greet the candidate briefly, acknowledge you're continuing, then ask the next question. Do NOT repeat previous questions.`
+      : `Begin the interview now. Greet the candidate briefly, then call open_file for the first topic and ask your first question.`;
+
+    provider.sendText(openingText);
 
     await this.waitCancelled(opts);
     await this.stop(onEvent);
@@ -326,6 +361,11 @@ RULES:
     chained.setContext(context);
     chained.setMaxQuestions(config.interview.maxQuestions);
     this.chained = chained;
+
+    // Seed prior conversation history when resuming
+    if (opts.priorTranscript && opts.priorTranscript.length > 0) {
+      chained.seedTranscript(opts.priorTranscript);
+    }
 
     // Chat uses OpenAI-compatible endpoint (OpenRouter /chat/completions)
     // The ACP agent is NOT used for chat — it doesn't follow the <open_file> tag
@@ -440,6 +480,9 @@ RULES:
       onEvent({ kind: 'agent_message', text: turn.text });
       logger.log(`[chat] "${turn.text}"`);
 
+      // Persist transcript after each turn
+      this.persistSession();
+
       // 3. TTS → send to webview for playback
       await this.speakText(turn.text, onEvent);
 
@@ -530,6 +573,8 @@ RULES:
 
   async stop(onEvent?: (e: InterviewEvent) => void): Promise<void> {
     this.cancelled = true;
+    // Persist final session state before tearing down
+    this.persistSession();
     try { await this.mic?.stop(); } catch { /* ignore */ }
     try { await this.paMic?.stop(); } catch { /* ignore */ }
     try { await this.playback?.stop(); } catch { /* ignore */ }
