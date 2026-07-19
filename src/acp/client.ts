@@ -50,6 +50,7 @@ export class AcpClient extends EventEmitter {
   private buffer = '';
   private closed = false;
   private initialized = false;
+  private disposeReason: Error | null = null;
 
   constructor(
     private readonly command: ResolvedAgentCommand,
@@ -169,9 +170,9 @@ export class AcpClient extends EventEmitter {
       } else if (msg.method === 'session/request_permission') {
         // Server-initiated request expects a response
         this.emit('permission', msg.params as PermissionRequest);
-        // Auto-approve by default for read-only context gathering; the orchestrator can override.
-        // We respond below once a listener has a chance to handle it. For simplicity, auto-allow.
-        this.respond(msg.id, { outcome: { outcome: 'selected', optionId: 'allow-once' } });
+        // Repository analysis must remain read-only. Agents can read through their
+        // own sandbox, but unexpected write/command permission requests are rejected.
+        this.respond(msg.id, { outcome: { outcome: 'rejected' } });
       } else if (msg.method === 'session/cancel') {
         this.emit('cancel', msg.params);
       } else {
@@ -233,6 +234,7 @@ export class AcpClient extends EventEmitter {
   }
 
   async cancel(sessionId: string): Promise<void> {
+    if (!this.proc || this.closed) return;
     this.send({ jsonrpc: '2.0', method: 'session/cancel', params: { sessionId } });
   }
 
@@ -248,7 +250,10 @@ export class AcpClient extends EventEmitter {
     return this.initialized;
   }
 
-  async dispose(): Promise<void> {
+  async dispose(reason: Error = new Error('ACP client disposed')): Promise<void> {
+    this.disposeReason = reason;
+    for (const pending of this.pending.values()) pending.reject(reason);
+    this.pending.clear();
     try {
       if (this.proc && !this.closed) {
         this.proc.stdin?.end();
@@ -258,5 +263,6 @@ export class AcpClient extends EventEmitter {
       /* ignore */
     }
     this.proc = null;
+    this.closed = true;
   }
 }

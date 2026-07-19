@@ -23,6 +23,13 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
     throw new Error(`Agent "${opts.agent.name}" has no resolvable launch command on this platform.`);
   }
   const client = new AcpClient(opts.agent.resolved, opts.cwd, opts.agentConfig);
+  let sessionId: string | undefined;
+  let cancelled = false;
+  const cancellation = opts.token?.onCancellationRequested(() => {
+    cancelled = true;
+    if (sessionId) void client.cancel(sessionId);
+    setTimeout(() => { if (cancelled) void client.dispose(new vscode.CancellationError()); }, 1500);
+  });
   let collected = '';
   client.on('log', (l) => {
     const s = typeof l === 'string' ? l.trim() : String(l);
@@ -42,7 +49,8 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
   await client.start();
   try {
     await client.initialize();
-    const sessionId = await client.newSession(opts.cwd, []);
+    if (cancelled) throw new vscode.CancellationError();
+    sessionId = await client.newSession(opts.cwd, []);
     const prompt = [
       { type: 'text', text: opts.contextPrompt },
       {
@@ -51,9 +59,11 @@ export async function gatherCodebaseContext(opts: GatherOptions): Promise<Codeba
       },
     ];
     await client.prompt(sessionId, prompt);
+    if (cancelled) throw new vscode.CancellationError();
     await client.closeSession(sessionId);
   } finally {
-    await client.dispose();
+    cancellation?.dispose();
+    await client.dispose(cancelled ? new vscode.CancellationError() : undefined);
   }
 
   return parseContext(collected, opts.cwd);
