@@ -289,6 +289,9 @@ export class AcpClient extends EventEmitter {
       if (this.proc && !this.closed) {
         this.proc.stdin?.end();
         this.proc.kill('SIGTERM');
+        // Wait for the child to actually exit so Windows releases file handles
+        // in the agent's working directory before the caller cleans it up.
+        await waitForExit(this.proc, 3000);
       }
     } catch {
       /* ignore */
@@ -296,4 +299,17 @@ export class AcpClient extends EventEmitter {
     this.proc = null;
     this.closed = true;
   }
+}
+
+function waitForExit(proc: { on: (event: string, cb: (...args: any[]) => void) => void; kill: (signal?: any) => void }, timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(); } };
+    proc.on('exit', done);
+    proc.on('error', done);
+    setTimeout(() => {
+      try { proc.kill('SIGKILL'); } catch { /* already gone */ }
+      done();
+    }, timeoutMs);
+  });
 }

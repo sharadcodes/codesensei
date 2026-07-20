@@ -23,7 +23,7 @@ const MODE_GUIDANCE: Record<ExplanationMode, string> = {
 };
 
 function buildPrompt(mode: ExplanationMode, buildAccess: BuildAccess, projectType: string, files: string[]): string {
-  return `You are a senior engineer onboarding someone to this repository. Create a trustworthy Markdown guide titled "CodeSensei Guide".
+  return `You are a senior engineer onboarding someone to this repository. Create a trustworthy Markdown guide titled "AI CodeSensei Guide".
 
 DEPTH: ${MODE_GUIDANCE[mode]}
 PROJECT TYPE: ${projectType}

@@ -1,0 +1,102 @@
+name: Build VSIX artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/vsix-artifacts]
+
+concurrency:
+  group: build-vsix-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: Validate and read version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out triggering commit
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate extension
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          VERSION="$(node -p 'require("./package.json").version')"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-14
+          - target: darwin-x64
+            runner: macos-15-intel
+          - target: linux-x64
+            runner: ubuntu-22.04
+          - target: win32-x64
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    env:
+      npm_config_build_from_source: "true"
+    steps:
+      - name: Check out triggering commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply release version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Build native addon and extension
+        run: |
+          npm rebuild naudiodon2
+          npm run build
+
+      - name: Verify native architecture and runtime loading
+        run: |
+          node scripts/verify-native-arch.mjs "${{ matrix.target }}" dist/native/naudiodon.node
+          node -e "const addon = require('./dist/native/naudiodon.node'); if (typeof addon.create !== 'function') process.exit(1)"
+
+      - name: Package targeted VSIX
+        run: |
+          node -e "require('fs').mkdirSync('release', { recursive: true })"
+          npx vsce package --no-yarn --no-dependencies --target "${{ matrix.target }}" --out "release/ai-codesensei-${{ matrix.target }}-${{ needs.prepare.outputs.version }}.vsix"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.target }}
+          path: release/*.vsix
+          if-no-files-found: error
+          retention-days: 30
