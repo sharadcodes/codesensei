@@ -29,7 +29,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Validate extension
         run: |
@@ -54,7 +54,7 @@ jobs:
           - target: darwin-x64
             runner: macos-15-intel
           - target: linux-x64
-            runner: ubuntu-24.04
+            runner: ubuntu-22.04
           - target: win32-x64
             runner: windows-2022
     runs-on: ${{ matrix.runner }}
