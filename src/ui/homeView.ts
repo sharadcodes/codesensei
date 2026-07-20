@@ -368,7 +368,7 @@ export class HomeViewProvider implements vscode.WebviewViewProvider {
   private showCapabilities(agentId: string): void {
     const agent = this.state.agents.find((item) => item.id === agentId);
     if (!agent) return;
-    const output = vscode.window.createOutputChannel('CodeSensei: Agent Capabilities');
+    const output = vscode.window.createOutputChannel('AI CodeSensei: Agent Capabilities');
     output.show();
     output.appendLine(JSON.stringify(agent.capabilities ?? { message: 'No capabilities probed. Click Refresh.' }, null, 2));
   }
