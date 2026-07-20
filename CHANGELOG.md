@@ -5,6 +5,12 @@ All notable changes to AI CodeSensei will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-07-20
+
+### Fixed
+
+- Code Tutor guide generation no longer fails with `EBUSY` on Windows when the ACP agent's temp analysis directory is cleaned up. The ACP client now waits for the agent subprocess to exit before cleanup, and the cleanup retries on `EBUSY`/`EPERM`/`ENOTEMPTY`.
+
 ## [0.2.1] - 2026-07-20
 
 ### Added

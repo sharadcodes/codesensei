@@ -481,7 +481,7 @@ export async function probeInitializeAndSession(resolved: ResolvedAgentCommand):
           terminal: false,
           session: { configOptions: { boolean: {} } },
         },
-        clientInfo: { name: 'codesensei', title: 'CodeSensei', version: '0.1.0' },
+        clientInfo: { name: 'codesensei', title: 'AI CodeSensei', version: '0.1.0' },
       },
     });
   });

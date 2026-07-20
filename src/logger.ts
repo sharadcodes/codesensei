@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 /**
  * Persistent output channel that shows up in VSCode's Output panel dropdown
- * as "CodeSensei". All extension logs (ACP agent stderr, Realtime events,
+ * as "AI CodeSensei". All extension logs (ACP agent stderr, Realtime events,
  * audio capture, orchestrator state) route through here so users can watch
  * the full pipeline live.
  */
