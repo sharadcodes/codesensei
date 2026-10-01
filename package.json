@@ -2,7 +2,7 @@
   "name": "ai-codesensei",
   "displayName": "AI CodeSensei",
   "description": "Learn any codebase with AI, then test your understanding through a live, voice-driven Knowledge Check session.",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "publisher": "sharadcodes--g-savitha--iamnabina",
   "license": "MIT",
   "repository": {
@@ -54,42 +54,42 @@
     "commands": [
       {
         "command": "codeSensei.startInterview",
-        "title": "CodeSensei: Start Knowledge Check"
+        "title": "AI CodeSensei: Start Knowledge Check"
       },
       {
         "command": "codeSensei.stopInterview",
-        "title": "CodeSensei: Stop Active Operation"
+        "title": "AI CodeSensei: Stop Active Operation"
       },
       {
         "command": "codeSensei.showLogs",
-        "title": "CodeSensei: Show Logs"
+        "title": "AI CodeSensei: Show Logs"
       },
       {
         "command": "codeSensei.refreshAgents",
-        "title": "CodeSensei: Refresh ACP Agents"
+        "title": "AI CodeSensei: Refresh ACP Agents"
       },
       {
         "command": "codeSensei.testMic",
-        "title": "CodeSensei: Test Microphone"
+        "title": "AI CodeSensei: Test Microphone"
       },
       {
         "command": "codeSensei.testSpeaker",
-        "title": "CodeSensei: Test Speaker (TTS)"
+        "title": "AI CodeSensei: Test Speaker (TTS)"
       },
       {
         "command": "codeSensei.clearSession",
-        "title": "CodeSensei: Clear Cached Session"
+        "title": "AI CodeSensei: Clear Cached Session"
       },
       {
         "command": "codeSensei.generateGuide",
-        "title": "CodeSensei: Generate Codebase Guide"
+        "title": "AI CodeSensei: Generate Codebase Guide"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "codeSensei",
-          "title": "CodeSensei",
+          "title": "AI CodeSensei",
           "icon": "media/codesensei-logo.svg"
         }
       ]
@@ -105,7 +105,7 @@
     },
     "menus": {},
     "configuration": {
-      "title": "CodeSensei",
+      "title": "AI CodeSensei",
       "properties": {
         "codeSensei.stt.baseUrl": {
           "type": "string",
@@ -279,10 +279,14 @@
   "scripts": {
     "vscode:prepublish": "npm run build",
     "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --external:naudiodon2 --format=cjs --platform=node --target=node18 --sourcemap && node scripts/copy-native.mjs",
+    "build:darwin-arm64": "npm rebuild naudiodon2 --build-from-source --arch=arm64 && npm run build",
+    "build:darwin-x64": "npm rebuild naudiodon2 --build-from-source --arch=x64 && npm run build",
     "watch": "npm run build -- --watch",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/check-webview.mjs && node --test scripts/source-policy.test.mjs",
-    "package": "vsce package --no-yarn --no-dependencies"
+    "package": "vsce package --no-yarn --no-dependencies",
+    "package:darwin-arm64": "npm run build:darwin-arm64 && vsce package --no-yarn --no-dependencies --target darwin-arm64",
+    "package:darwin-x64": "npm run build:darwin-x64 && vsce package --no-yarn --no-dependencies --target darwin-x64"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

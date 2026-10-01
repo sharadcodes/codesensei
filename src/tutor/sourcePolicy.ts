@@ -85,8 +85,22 @@ export async function createAnalysisWorkspace(root: string, buildAccess: BuildAc
     cwd: destination,
     files,
     projectType,
-    cleanup: () => fs.rm(destination, { recursive: true, force: true }),
+    cleanup: () => rmWithRetry(destination),
   };
+}
+
+async function rmWithRetry(target: string, attempts = 5): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await fs.rm(target, { recursive: true, force: true });
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'EBUSY' && code !== 'EPERM' && code !== 'ENOTEMPTY') throw err;
+      if (i === attempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+    }
+  }
 }
 
 export function detectProjectType(rootNames: Set<string>): string {

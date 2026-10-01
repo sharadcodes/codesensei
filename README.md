@@ -131,6 +131,14 @@ All settings live under the `AI CodeSensei.*` namespace. Open Settings (`Ctrl+,`
 - **Chained voice pipeline** — PortAudio mic capture → VAD → STT → LLM chat → TTS → webview playback. All components are swappable behind their interfaces.
 - **Source policy** — the Code Tutor guide generator creates a curated, read-only analysis workspace with only permitted files, preventing the agent from accessing secrets or irrelevant files.
 
+## Build VSIX artifacts
+
+`.github/workflows/publish-marketplace.yml` is triggered manually via `workflow_dispatch` (Actions tab → Run workflow). It validates the extension, reads the version from `package.json`, builds separate Apple Silicon macOS, Intel macOS, x64 Linux, and x64 Windows VSIX packages, verifies their native architectures and runtime loading, and uploads the VSIX files as downloadable workflow artifacts.
+
+Windows ARM64 and Linux ARM64 are not currently built because `naudiodon2` 2.5.0 bundles x64-only PortAudio libraries for those platforms.
+
+Bump the version in `package.json` on the target branch before triggering the workflow.
+
 ## License
 
 [MIT](LICENSE)
